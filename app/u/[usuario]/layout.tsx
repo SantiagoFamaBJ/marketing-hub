@@ -5,12 +5,8 @@ import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 
 type Usuario = {
-  id: string
-  nombre: string
-  slug: string
-  avatar_color: string
-  avatar_emoji: string
-  rol: string
+  id: string; nombre: string; slug: string
+  avatar_color: string; avatar_emoji: string; rol: string
 }
 
 const navItems = [
@@ -20,10 +16,11 @@ const navItems = [
   { href: '/copys', label: 'Copys', emoji: '✍️' },
   { href: '/calendario', label: 'Calendario', emoji: '📅' },
   { href: '/manuales', label: 'Manuales', emoji: '📚' },
+  { href: '/historial', label: 'Historial', emoji: '🕐' },
   { href: '/notas', label: 'Mis notas', emoji: '📝' },
 ]
 
-const adminItems = [
+const reporteItems = [
   { href: '/reportes', label: 'Reportes', emoji: '📊' },
 ]
 
@@ -47,16 +44,36 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
     return pathname === full
   }
 
+  function NavLink({ href, label, emoji }: { href: string; label: string; emoji: string }) {
+    const full = href === '' ? base : `${base}${href}`
+    const active = isActive(href)
+    return (
+      <Link href={full} style={{
+        display: 'flex', alignItems: 'center', gap: '0.625rem',
+        padding: '0.5rem 0.625rem', borderRadius: '8px', marginBottom: '2px',
+        textDecoration: 'none',
+        backgroundColor: active ? '#f9ddd3' : 'transparent',
+        color: active ? '#f15922' : '#444',
+        fontWeight: active ? 600 : 400, fontSize: '0.875rem',
+        transition: 'all 0.15s ease',
+      }}
+        onMouseEnter={e => { if (!active) e.currentTarget.style.backgroundColor = '#f4f4f4' }}
+        onMouseLeave={e => { if (!active) e.currentTarget.style.backgroundColor = 'transparent' }}
+      >
+        <span style={{ fontSize: '1rem' }}>{emoji}</span>
+        {label}
+      </Link>
+    )
+  }
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#fafafa' }}>
-
       <aside style={{
         width: 240, backgroundColor: '#ffffff',
         borderRight: '1px solid #e8e8e8',
         display: 'flex', flexDirection: 'column',
         position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 100,
       }}>
-
         {/* Logo */}
         <div style={{ padding: '1.5rem 1.25rem 1rem', borderBottom: '1px solid #f4f4f4' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -76,52 +93,14 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
           <p style={{ fontSize: '0.65rem', fontWeight: 600, color: '#a0a0a0', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '0 0.5rem', marginBottom: '0.25rem' }}>
             General
           </p>
-          {navItems.map(item => {
-            const active = isActive(item.href)
-            return (
-              <Link key={item.href} href={item.href === '' ? base : `${base}${item.href}`} style={{
-                display: 'flex', alignItems: 'center', gap: '0.625rem',
-                padding: '0.5rem 0.625rem', borderRadius: '8px', marginBottom: '2px',
-                textDecoration: 'none',
-                backgroundColor: active ? '#f9ddd3' : 'transparent',
-                color: active ? '#f15922' : '#444',
-                fontWeight: active ? 600 : 400, fontSize: '0.875rem',
-                transition: 'all 0.15s ease',
-              }}
-                onMouseEnter={e => { if (!active) e.currentTarget.style.backgroundColor = '#f4f4f4' }}
-                onMouseLeave={e => { if (!active) e.currentTarget.style.backgroundColor = 'transparent' }}
-              >
-                <span style={{ fontSize: '1rem' }}>{item.emoji}</span>
-                {item.label}
-              </Link>
-            )
-          })}
+          {navItems.map(item => <NavLink key={item.href} {...item} />)}
 
-          {usuario.rol === 'admin' && (
+          {usuario.rol === 'mkt_reporte' && (
             <>
               <p style={{ fontSize: '0.65rem', fontWeight: 600, color: '#a0a0a0', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '0 0.5rem', marginBottom: '0.25rem', marginTop: '1rem' }}>
-                Administración
+                Gestión
               </p>
-              {adminItems.map(item => {
-                const active = isActive(item.href)
-                return (
-                  <Link key={item.href} href={`${base}${item.href}`} style={{
-                    display: 'flex', alignItems: 'center', gap: '0.625rem',
-                    padding: '0.5rem 0.625rem', borderRadius: '8px', marginBottom: '2px',
-                    textDecoration: 'none',
-                    backgroundColor: active ? '#f9ddd3' : 'transparent',
-                    color: active ? '#f15922' : '#444',
-                    fontWeight: active ? 600 : 400, fontSize: '0.875rem',
-                    transition: 'all 0.15s ease',
-                  }}
-                    onMouseEnter={e => { if (!active) e.currentTarget.style.backgroundColor = '#f4f4f4' }}
-                    onMouseLeave={e => { if (!active) e.currentTarget.style.backgroundColor = 'transparent' }}
-                  >
-                    <span style={{ fontSize: '1rem' }}>{item.emoji}</span>
-                    {item.label}
-                  </Link>
-                )
-              })}
+              {reporteItems.map(item => <NavLink key={item.href} {...item} />)}
             </>
           )}
         </nav>
@@ -132,16 +111,16 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
           display: 'flex', alignItems: 'center', gap: '0.625rem',
         }}>
           <div style={{
-            width: 34, height: 34, borderRadius: '50%',
-            backgroundColor: usuario.avatar_color,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '1rem', flexShrink: 0,
+            width: 34, height: 34, borderRadius: '50%', backgroundColor: usuario.avatar_color,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0,
           }}>{usuario.avatar_emoji}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1a1a1a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {usuario.nombre}
             </p>
-            <p style={{ fontSize: '0.7rem', color: '#a0a0a0' }}>{usuario.rol}</p>
+            <p style={{ fontSize: '0.7rem', color: '#a0a0a0' }}>
+              {usuario.rol === 'mkt_reporte' ? 'MKT + Reporte' : 'Marketing'}
+            </p>
           </div>
           <button onClick={() => { sessionStorage.removeItem('mkt_usuario'); router.push('/') }}
             title="Cambiar usuario" style={{
