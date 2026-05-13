@@ -4,10 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
 type Usuario = { id: string; nombre: string; slug: string; avatar_color: string; avatar_emoji: string; rol: string }
-type Campana = {
-  id: string; nombre: string; descripcion: string | null; color: string
-  fecha_inicio: string | null; fecha_fin: string | null; estado: string; creado_por: string
-}
+type Campana = { id: string; nombre: string; descripcion: string | null; color: string; fecha_inicio: string | null; fecha_fin: string | null; estado: string; creado_por: string }
 
 const ESTADOS = [
   { key: 'activa', label: 'Activa', color: '#10b981', bg: '#f0fdf4' },
@@ -15,14 +12,9 @@ const ESTADOS = [
   { key: 'completada', label: 'Completada', color: '#3b82f6', bg: '#eff6ff' },
   { key: 'archivada', label: 'Archivada', color: '#6b7280', bg: '#f9fafb' },
 ]
-
 const COLORES = ['#f15922', '#3B82F6', '#8B5CF6', '#10B981', '#F59E0B', '#EC4899', '#06B6D4', '#F97316']
 
-const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '0.625rem 0.875rem',
-  border: '1.5px solid #e8e8e8', borderRadius: '8px',
-  fontSize: '0.875rem', outline: 'none', color: '#1a1a1a', backgroundColor: '#fff',
-}
+const inputStyle: React.CSSProperties = { width: '100%', padding: '0.625rem 0.875rem', border: '1.5px solid #e8e8e8', borderRadius: '8px', fontSize: '0.875rem', outline: 'none', color: '#1a1a1a', backgroundColor: '#fff' }
 
 function Campo({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -39,10 +31,7 @@ export default function CampanasPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editando, setEditando] = useState<Campana | null>(null)
   const [loading, setLoading] = useState(false)
-  const [form, setForm] = useState({
-    nombre: '', descripcion: '', color: '#f15922',
-    fecha_inicio: '', fecha_fin: '', estado: 'activa',
-  })
+  const [form, setForm] = useState({ nombre: '', descripcion: '', color: '#f15922', fecha_inicio: '', fecha_fin: '', estado: 'activa' })
 
   useEffect(() => {
     const stored = sessionStorage.getItem('mkt_usuario')
@@ -70,8 +59,12 @@ export default function CampanasPage() {
     if (!form.nombre.trim() || !usuario) return
     setLoading(true)
     const payload = {
-      nombre: form.nombre, descripcion: form.descripcion || null, color: form.color,
-      fecha_inicio: form.fecha_inicio || null, fecha_fin: form.fecha_fin || null, estado: form.estado,
+      nombre: form.nombre,
+      descripcion: form.descripcion || null,
+      color: form.color,
+      fecha_inicio: form.fecha_inicio || null,
+      fecha_fin: form.fecha_fin || null,
+      estado: form.estado,
     }
     if (editando) {
       await supabase.from('mkt_campanas').update(payload).eq('id', editando.id)
@@ -84,73 +77,46 @@ export default function CampanasPage() {
   }
 
   async function eliminar(c: Campana) {
-    if (!confirm(`¿Eliminás la campaña "${c.nombre}"?`)) return
+    if (!confirm(`¿Eliminás "${c.nombre}"?`)) return
     await supabase.from('mkt_campanas').delete().eq('id', c.id)
     fetchCampanas()
   }
 
-  const puedeEditar = usuario?.rol === 'admin'
+  if (!usuario) return null
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.6rem', fontWeight: 700, color: '#1a1a1a' }}>📣 Campañas</h1>
+          <h1 style={{ fontSize: 'clamp(1.25rem, 4vw, 1.6rem)', fontWeight: 700, color: '#1a1a1a' }}>📣 Campañas</h1>
           <p style={{ color: '#888', fontSize: '0.9rem', marginTop: '0.25rem' }}>Organizá tareas y recursos por campaña</p>
         </div>
-        {puedeEditar && (
-          <button onClick={abrirNueva} style={{
-            backgroundColor: '#f15922', color: '#fff', border: 'none',
-            borderRadius: '10px', padding: '0.625rem 1.25rem', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer',
-          }}>+ Nueva campaña</button>
-        )}
+        <button onClick={abrirNueva} style={{ backgroundColor: '#f15922', color: '#fff', border: 'none', borderRadius: '10px', padding: '0.625rem 1.25rem', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer' }}>+ Nueva campaña</button>
       </div>
 
-      {/* Grid de campañas */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem' }}>
         {campanas.map(c => {
           const estado = ESTADOS.find(e => e.key === c.estado)
           return (
-            <div key={c.id} style={{
-              backgroundColor: '#fff', border: '1.5px solid #e8e8e8',
-              borderRadius: '14px', overflow: 'hidden',
-              transition: 'box-shadow 0.15s ease',
-            }}
+            <div key={c.id} style={{ backgroundColor: '#fff', border: '1.5px solid #e8e8e8', borderRadius: '14px', overflow: 'hidden', transition: 'box-shadow 0.15s' }}
               onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'}
-              onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
-            >
-              {/* Barra de color */}
+              onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}>
               <div style={{ height: 6, backgroundColor: c.color }} />
               <div style={{ padding: '1.25rem' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                   <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1a1a1a' }}>{c.nombre}</h3>
-                  <span style={{
-                    fontSize: '0.65rem', fontWeight: 600, padding: '2px 8px', borderRadius: '99px',
-                    backgroundColor: estado?.bg, color: estado?.color,
-                  }}>{estado?.label}</span>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 600, padding: '2px 8px', borderRadius: '99px', backgroundColor: estado?.bg, color: estado?.color, flexShrink: 0, marginLeft: '0.5rem' }}>{estado?.label}</span>
                 </div>
-                {c.descripcion && (
-                  <p style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.75rem', lineHeight: 1.4 }}>{c.descripcion}</p>
-                )}
+                {c.descripcion && <p style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.75rem', lineHeight: 1.4 }}>{c.descripcion}</p>}
                 {(c.fecha_inicio || c.fecha_fin) && (
                   <p style={{ fontSize: '0.75rem', color: '#888', marginBottom: '0.75rem' }}>
-                    📅 {c.fecha_inicio ? new Date(c.fecha_inicio + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }) : '?'}
-                    {' → '}
-                    {c.fecha_fin ? new Date(c.fecha_fin + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }) : '?'}
+                    📅 {c.fecha_inicio ? new Date(c.fecha_inicio + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }) : '?'} → {c.fecha_fin ? new Date(c.fecha_fin + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }) : '?'}
                   </p>
                 )}
-                {puedeEditar && (
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button onClick={() => abrirEditar(c)} style={{
-                      flex: 1, padding: '0.375rem', border: '1.5px solid #e8e8e8',
-                      borderRadius: '7px', backgroundColor: '#fff', cursor: 'pointer', fontSize: '0.775rem', color: '#555',
-                    }}>Editar</button>
-                    <button onClick={() => eliminar(c)} style={{
-                      padding: '0.375rem 0.75rem', border: '1.5px solid #fecaca',
-                      borderRadius: '7px', backgroundColor: '#fef2f2', cursor: 'pointer', fontSize: '0.775rem', color: '#ef4444',
-                    }}>Eliminar</button>
-                  </div>
-                )}
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button onClick={() => abrirEditar(c)} style={{ flex: 1, padding: '0.375rem', border: '1.5px solid #e8e8e8', borderRadius: '7px', backgroundColor: '#fff', cursor: 'pointer', fontSize: '0.775rem', color: '#555' }}>Editar</button>
+                  <button onClick={() => eliminar(c)} style={{ padding: '0.375rem 0.75rem', border: '1.5px solid #fecaca', borderRadius: '7px', backgroundColor: '#fef2f2', cursor: 'pointer', fontSize: '0.775rem', color: '#ef4444' }}>✕</button>
+                </div>
               </div>
             </div>
           )
@@ -166,17 +132,10 @@ export default function CampanasPage() {
 
       {/* Modal */}
       {modalOpen && (
-        <div style={{
-          position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem',
-        }} onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}>
-          <div style={{
-            backgroundColor: '#fff', borderRadius: '16px', padding: '2rem',
-            width: '100%', maxWidth: 480, boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
-          }}>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1.5rem', color: '#1a1a1a' }}>
-              {editando ? 'Editar campaña' : 'Nueva campaña'}
-            </h2>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}
+          onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: '16px', padding: '2rem', width: '100%', maxWidth: 480, boxShadow: '0 20px 60px rgba(0,0,0,0.15)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1.5rem', color: '#1a1a1a' }}>{editando ? 'Editar campaña' : 'Nueva campaña'}</h2>
             <Campo label="Nombre *">
               <input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Ej: Congreso AAPODE Mayo" style={inputStyle} />
             </Campo>
@@ -197,25 +156,15 @@ export default function CampanasPage() {
               </select>
             </Campo>
             <Campo label="Color">
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 {COLORES.map(c => (
-                  <button key={c} onClick={() => setForm(f => ({ ...f, color: c }))} style={{
-                    width: 28, height: 28, borderRadius: '50%', backgroundColor: c, border: 'none',
-                    outline: form.color === c ? '3px solid #1a1a1a' : 'none', cursor: 'pointer',
-                  }} />
+                  <button key={c} onClick={() => setForm(f => ({ ...f, color: c }))} style={{ width: 28, height: 28, borderRadius: '50%', backgroundColor: c, border: 'none', outline: form.color === c ? '3px solid #1a1a1a' : 'none', cursor: 'pointer' }} />
                 ))}
               </div>
             </Campo>
             <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <button onClick={() => setModalOpen(false)} style={{
-                flex: 1, padding: '0.625rem', border: '1.5px solid #e8e8e8',
-                borderRadius: '8px', backgroundColor: '#fff', cursor: 'pointer', fontSize: '0.875rem', color: '#555',
-              }}>Cancelar</button>
-              <button onClick={guardar} disabled={loading} style={{
-                flex: 2, padding: '0.625rem', border: 'none',
-                borderRadius: '8px', backgroundColor: '#f15922', color: '#fff',
-                cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600,
-              }}>{loading ? 'Guardando...' : editando ? 'Guardar cambios' : 'Crear campaña'}</button>
+              <button onClick={() => setModalOpen(false)} style={{ flex: 1, padding: '0.625rem', border: '1.5px solid #e8e8e8', borderRadius: '8px', backgroundColor: '#fff', cursor: 'pointer', fontSize: '0.875rem', color: '#555' }}>Cancelar</button>
+              <button onClick={guardar} disabled={loading} style={{ flex: 2, padding: '0.625rem', border: 'none', borderRadius: '8px', backgroundColor: '#f15922', color: '#fff', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600 }}>{loading ? 'Guardando...' : editando ? 'Guardar cambios' : 'Crear campaña'}</button>
             </div>
           </div>
         </div>
