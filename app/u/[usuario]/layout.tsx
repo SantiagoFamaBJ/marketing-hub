@@ -30,13 +30,10 @@ const adminItems = [
 
 export default function UsuarioLayout({
   children,
-  params,
 }: {
   children: React.ReactNode
-  params: any
 }) {
   const [usuario, setUsuario] = useState<Usuario | null>(null)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
 
@@ -52,7 +49,7 @@ export default function UsuarioLayout({
 
   if (!usuario) return null
 
-  const base = `/${usuario.slug}`
+  const base = `/u/${usuario.slug}`
 
   function isActive(href: string) {
     const full = href === '' ? base : `${base}${href}`
@@ -74,7 +71,6 @@ export default function UsuarioLayout({
         left: 0,
         height: '100vh',
         zIndex: 100,
-        transition: 'transform 0.2s ease',
       }}>
 
         {/* Logo */}
@@ -103,7 +99,7 @@ export default function UsuarioLayout({
         </div>
 
         {/* Nav */}
-        <nav style={{ padding: '0.75rem 0.75rem', flex: 1, overflowY: 'auto' }}>
+        <nav style={{ padding: '0.75rem', flex: 1, overflowY: 'auto' }}>
           <p style={{ fontSize: '0.65rem', fontWeight: 600, color: '#a0a0a0', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '0 0.5rem', marginBottom: '0.25rem' }}>
             General
           </p>
@@ -128,14 +124,10 @@ export default function UsuarioLayout({
                   transition: 'all 0.15s ease',
                 }}
                 onMouseEnter={e => {
-                  if (!active) {
-                    e.currentTarget.style.backgroundColor = '#f4f4f4'
-                  }
+                  if (!active) e.currentTarget.style.backgroundColor = '#f4f4f4'
                 }}
                 onMouseLeave={e => {
-                  if (!active) {
-                    e.currentTarget.style.backgroundColor = 'transparent'
-                  }
+                  if (!active) e.currentTarget.style.backgroundColor = 'transparent'
                 }}
               >
                 <span style={{ fontSize: '1rem' }}>{item.emoji}</span>
@@ -144,7 +136,6 @@ export default function UsuarioLayout({
             )
           })}
 
-          {/* Admin items */}
           {usuario.rol === 'admin' && (
             <>
               <p style={{ fontSize: '0.65rem', fontWeight: 600, color: '#a0a0a0', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '0 0.5rem', marginBottom: '0.25rem', marginTop: '1rem' }}>
