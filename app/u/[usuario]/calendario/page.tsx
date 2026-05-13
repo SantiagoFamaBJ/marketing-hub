@@ -62,7 +62,7 @@ export default function CalendarioPage() {
     const completas = await Promise.all(td.map(async t => {
       const { data: ad } = await supabase.from('mkt_tarea_asignados').select('usuario_id').eq('tarea_id', t.id)
       const aIds = (ad || []).map((a: any) => a.usuario_id)
-      const { data: au } = await supabase.from('mkt_usuarios').select('*').in('id', aIds.length > 0 ? aIds : ['none'])
+      const { data: au } = await supabase.from('mkt_usuarios').select('*').in('id', aIds.length > 0 ? aIds : ['00000000-0000-0000-0000-000000000000'])
       return { ...t, asignados: au || [] }
     }))
     setTareas(completas)

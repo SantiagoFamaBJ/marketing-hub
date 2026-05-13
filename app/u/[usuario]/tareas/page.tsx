@@ -86,8 +86,8 @@ export default function TareasPage() {
       const { data: ed } = await supabase.from('mkt_tarea_etiquetas').select('etiqueta_id').eq('tarea_id', t.id)
       const aIds = (ad || []).map((a: any) => a.usuario_id)
       const eIds = (ed || []).map((e: any) => e.etiqueta_id)
-      const { data: au } = await supabase.from('mkt_usuarios').select('*').in('id', aIds.length > 0 ? aIds : ['none'])
-      const { data: eo } = await supabase.from('mkt_etiquetas').select('*').in('id', eIds.length > 0 ? eIds : ['none'])
+      const { data: au } = await supabase.from('mkt_usuarios').select('*').in('id', aIds.length > 0 ? aIds : ['00000000-0000-0000-0000-000000000000'])
+      const { data: eo } = await supabase.from('mkt_etiquetas').select('*').in('id', eIds.length > 0 ? eIds : ['00000000-0000-0000-0000-000000000000'])
       return { ...t, asignados: au || [], etiquetas: eo || [] }
     }))
     setTareas(completas)

@@ -37,8 +37,8 @@ export default function DashboardPage() {
       const { data: etiquetasData } = await supabase.from('mkt_tarea_etiquetas').select('etiqueta_id').eq('tarea_id', t.id)
       const asignadosIds = (asignadosData || []).map((a: any) => a.usuario_id)
       const etiquetasIds = (etiquetasData || []).map((e: any) => e.etiqueta_id)
-      const { data: asignadosUsuarios } = await supabase.from('mkt_usuarios').select('*').in('id', asignadosIds.length > 0 ? asignadosIds : ['none'])
-      const { data: etiquetasObj } = await supabase.from('mkt_etiquetas').select('*').in('id', etiquetasIds.length > 0 ? etiquetasIds : ['none'])
+      const { data: asignadosUsuarios } = await supabase.from('mkt_usuarios').select('*').in('id', asignadosIds.length > 0 ? asignadosIds : ['00000000-0000-0000-0000-000000000000'])
+      const { data: etiquetasObj } = await supabase.from('mkt_etiquetas').select('*').in('id', etiquetasIds.length > 0 ? etiquetasIds : ['00000000-0000-0000-0000-000000000000'])
       return { ...t, asignados: asignadosUsuarios || [], etiquetas: etiquetasObj || [] }
     }))
 
