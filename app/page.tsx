@@ -39,7 +39,7 @@ export default function HomePage() {
   function handleSelect(usuario: Usuario) {
     // Guardamos el usuario en sessionStorage
     sessionStorage.setItem('mkt_usuario', JSON.stringify(usuario))
-    router.push(`/${usuario.slug}`)
+    router.push(`/u/${usuario.slug}`)
   }
 console.log('URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
 console.log('KEY:', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.slice(0, 20))
