@@ -25,26 +25,17 @@ const navItems = [
 
 const adminItems = [
   { href: '/reportes', label: 'Reportes', emoji: '📊' },
-  { href: '/admin', label: 'Admin', emoji: '⚙️' },
 ]
 
-export default function UsuarioLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function UsuarioLayout({ children }: { children: React.ReactNode }) {
   const [usuario, setUsuario] = useState<Usuario | null>(null)
   const router = useRouter()
   const pathname = usePathname()
 
   useEffect(() => {
     const stored = sessionStorage.getItem('mkt_usuario')
-    if (!stored) {
-      router.push('/')
-      return
-    }
-    const u = JSON.parse(stored)
-    setUsuario(u)
+    if (!stored) { router.push('/'); return }
+    setUsuario(JSON.parse(stored))
   }, [])
 
   if (!usuario) return null
@@ -59,38 +50,20 @@ export default function UsuarioLayout({
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#fafafa' }}>
 
-      {/* Sidebar */}
       <aside style={{
-        width: 240,
-        backgroundColor: '#ffffff',
+        width: 240, backgroundColor: '#ffffff',
         borderRight: '1px solid #e8e8e8',
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        height: '100vh',
-        zIndex: 100,
+        display: 'flex', flexDirection: 'column',
+        position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 100,
       }}>
 
         {/* Logo */}
-        <div style={{
-          padding: '1.5rem 1.25rem 1rem',
-          borderBottom: '1px solid #f4f4f4',
-        }}>
+        <div style={{ padding: '1.5rem 1.25rem 1rem', borderBottom: '1px solid #f4f4f4' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <div style={{
-              width: 32,
-              height: 32,
-              borderRadius: '8px',
-              backgroundColor: '#f15922',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '1rem',
-            }}>
-              🦷
-            </div>
+              width: 32, height: 32, borderRadius: '8px', backgroundColor: '#f15922',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem',
+            }}>🦷</div>
             <div>
               <p style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1a1a1a', lineHeight: 1.2 }}>Marketing Hub</p>
               <p style={{ fontSize: '0.65rem', color: '#a0a0a0' }}>Dental Medrano</p>
@@ -106,29 +79,17 @@ export default function UsuarioLayout({
           {navItems.map(item => {
             const active = isActive(item.href)
             return (
-              <Link
-                key={item.href}
-                href={item.href === '' ? base : `${base}${item.href}`}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.625rem',
-                  padding: '0.5rem 0.625rem',
-                  borderRadius: '8px',
-                  marginBottom: '2px',
-                  textDecoration: 'none',
-                  backgroundColor: active ? '#f9ddd3' : 'transparent',
-                  color: active ? '#f15922' : '#444',
-                  fontWeight: active ? 600 : 400,
-                  fontSize: '0.875rem',
-                  transition: 'all 0.15s ease',
-                }}
-                onMouseEnter={e => {
-                  if (!active) e.currentTarget.style.backgroundColor = '#f4f4f4'
-                }}
-                onMouseLeave={e => {
-                  if (!active) e.currentTarget.style.backgroundColor = 'transparent'
-                }}
+              <Link key={item.href} href={item.href === '' ? base : `${base}${item.href}`} style={{
+                display: 'flex', alignItems: 'center', gap: '0.625rem',
+                padding: '0.5rem 0.625rem', borderRadius: '8px', marginBottom: '2px',
+                textDecoration: 'none',
+                backgroundColor: active ? '#f9ddd3' : 'transparent',
+                color: active ? '#f15922' : '#444',
+                fontWeight: active ? 600 : 400, fontSize: '0.875rem',
+                transition: 'all 0.15s ease',
+              }}
+                onMouseEnter={e => { if (!active) e.currentTarget.style.backgroundColor = '#f4f4f4' }}
+                onMouseLeave={e => { if (!active) e.currentTarget.style.backgroundColor = 'transparent' }}
               >
                 <span style={{ fontSize: '1rem' }}>{item.emoji}</span>
                 {item.label}
@@ -144,29 +105,17 @@ export default function UsuarioLayout({
               {adminItems.map(item => {
                 const active = isActive(item.href)
                 return (
-                  <Link
-                    key={item.href}
-                    href={`${base}${item.href}`}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.625rem',
-                      padding: '0.5rem 0.625rem',
-                      borderRadius: '8px',
-                      marginBottom: '2px',
-                      textDecoration: 'none',
-                      backgroundColor: active ? '#f9ddd3' : 'transparent',
-                      color: active ? '#f15922' : '#444',
-                      fontWeight: active ? 600 : 400,
-                      fontSize: '0.875rem',
-                      transition: 'all 0.15s ease',
-                    }}
-                    onMouseEnter={e => {
-                      if (!active) e.currentTarget.style.backgroundColor = '#f4f4f4'
-                    }}
-                    onMouseLeave={e => {
-                      if (!active) e.currentTarget.style.backgroundColor = 'transparent'
-                    }}
+                  <Link key={item.href} href={`${base}${item.href}`} style={{
+                    display: 'flex', alignItems: 'center', gap: '0.625rem',
+                    padding: '0.5rem 0.625rem', borderRadius: '8px', marginBottom: '2px',
+                    textDecoration: 'none',
+                    backgroundColor: active ? '#f9ddd3' : 'transparent',
+                    color: active ? '#f15922' : '#444',
+                    fontWeight: active ? 600 : 400, fontSize: '0.875rem',
+                    transition: 'all 0.15s ease',
+                  }}
+                    onMouseEnter={e => { if (!active) e.currentTarget.style.backgroundColor = '#f4f4f4' }}
+                    onMouseLeave={e => { if (!active) e.currentTarget.style.backgroundColor = 'transparent' }}
                   >
                     <span style={{ fontSize: '1rem' }}>{item.emoji}</span>
                     {item.label}
@@ -177,63 +126,35 @@ export default function UsuarioLayout({
           )}
         </nav>
 
-        {/* Usuario actual */}
+        {/* Usuario */}
         <div style={{
-          padding: '1rem 1.25rem',
-          borderTop: '1px solid #f4f4f4',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.625rem',
+          padding: '1rem 1.25rem', borderTop: '1px solid #f4f4f4',
+          display: 'flex', alignItems: 'center', gap: '0.625rem',
         }}>
           <div style={{
-            width: 34,
-            height: 34,
-            borderRadius: '50%',
+            width: 34, height: 34, borderRadius: '50%',
             backgroundColor: usuario.avatar_color,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '1rem',
-            flexShrink: 0,
-          }}>
-            {usuario.avatar_emoji}
-          </div>
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '1rem', flexShrink: 0,
+          }}>{usuario.avatar_emoji}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1a1a1a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {usuario.nombre}
             </p>
             <p style={{ fontSize: '0.7rem', color: '#a0a0a0' }}>{usuario.rol}</p>
           </div>
-          <button
-            onClick={() => {
-              sessionStorage.removeItem('mkt_usuario')
-              router.push('/')
-            }}
-            title="Cambiar usuario"
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '1rem',
-              padding: '4px',
-              borderRadius: '6px',
-              color: '#a0a0a0',
+          <button onClick={() => { sessionStorage.removeItem('mkt_usuario'); router.push('/') }}
+            title="Cambiar usuario" style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: '1rem', padding: '4px', borderRadius: '6px', color: '#a0a0a0',
             }}
             onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f4f4f4'}
             onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-          >
-            ↩
-          </button>
+          >↩</button>
         </div>
       </aside>
 
-      {/* Contenido principal */}
-      <main style={{
-        marginLeft: 240,
-        flex: 1,
-        minHeight: '100vh',
-        padding: '2rem',
-      }}>
+      <main style={{ marginLeft: 240, flex: 1, minHeight: '100vh', padding: '2rem' }}>
         {children}
       </main>
     </div>
