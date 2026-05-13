@@ -24,7 +24,7 @@ export default function ReportesPage() {
     const stored = sessionStorage.getItem('mkt_usuario')
     if (!stored) { router.push('/'); return }
     const u = JSON.parse(stored)
-    if (u.rol !== 'admin') { router.push(`/u/${u.slug}`); return }
+    if (u.rol !== 'mkt_reporte') { router.push(`/u/${u.slug}`); return }
     setUsuario(u)
     fetchReportes()
   }, [])
