@@ -18,13 +18,14 @@ type Tarea = {
   asignados: Usuario[]; etiquetas: Etiqueta[]
 }
 type Campana = { id: string; nombre: string; color: string }
+type Comentario = { id: string; autor_id: string; contenido: string; creado_en: string; autor?: Usuario }
+type Adjunto = { id: string; nombre_archivo: string; url: string; tipo: string | null; creado_en: string }
 
 const COLUMNAS = [
   { key: 'por_hacer', label: 'Por hacer', color: '#6b7280', bg: '#f9fafb' },
   { key: 'en_progreso', label: 'En progreso', color: '#f59e0b', bg: '#fffbeb' },
   { key: 'hecho', label: 'Hecho', color: '#10b981', bg: '#f0fdf4' },
 ]
-
 const PRIORIDAD: Record<string, { color: string; bg: string; label: string }> = {
   alta: { color: '#ef4444', bg: '#fef2f2', label: '🔴 Alta' },
   media: { color: '#f59e0b', bg: '#fffbeb', label: '🟡 Media' },
@@ -50,9 +51,16 @@ export default function TareasPage() {
   const [tareaCompletando, setTareaCompletando] = useState<Tarea | null>(null)
   const [filtroEtiqueta, setFiltroEtiqueta] = useState('')
   const [filtroUsuario, setFiltroUsuario] = useState('')
+  const [form, setForm] = useState({ titulo: '', descripcion: '', prioridad: 'media', deadline: '', campana_id: '', asignados: [] as string[], etiquetas: [] as string[] })
   const [nuevaEtiquetaModal, setNuevaEtiquetaModal] = useState(false)
   const [nuevaEtiqueta, setNuevaEtiqueta] = useState({ nombre: '', color: '#f15922' })
-  const [form, setForm] = useState({ titulo: '', descripcion: '', prioridad: 'media', deadline: '', campana_id: '', asignados: [] as string[], etiquetas: [] as string[] })
+
+  // Comentarios y adjuntos
+  const [comentarios, setComentarios] = useState<Comentario[]>([])
+  const [adjuntos, setAdjuntos] = useState<Adjunto[]>([])
+  const [nuevoComentario, setNuevoComentario] = useState('')
+  const [subiendoAdjunto, setSubiendoAdjunto] = useState(false)
+  const [tabDetalle, setTabDetalle] = useState<'info' | 'comentarios' | 'adjuntos'>('info')
 
   useEffect(() => {
     const stored = sessionStorage.getItem('mkt_usuario')
@@ -67,17 +75,14 @@ export default function TareasPage() {
     const { data } = await supabase.from('mkt_usuarios').select('*').eq('activo', true)
     setTodosUsuarios(data || [])
   }
-
   async function fetchEtiquetas() {
     const { data } = await supabase.from('mkt_etiquetas').select('*').order('nombre')
     setEtiquetas(data || [])
   }
-
   async function fetchCampanas() {
     const { data } = await supabase.from('mkt_campanas').select('id, nombre, color').eq('estado', 'activa')
     setCampanas(data || [])
   }
-
   async function fetchTareas() {
     const { data: td } = await supabase.from('mkt_tareas').select('*').order('deadline', { ascending: true })
     if (!td) return
@@ -86,11 +91,56 @@ export default function TareasPage() {
       const { data: ed } = await supabase.from('mkt_tarea_etiquetas').select('etiqueta_id').eq('tarea_id', t.id)
       const aIds = (ad || []).map((a: any) => a.usuario_id)
       const eIds = (ed || []).map((e: any) => e.etiqueta_id)
-      const { data: au } = await supabase.from('mkt_usuarios').select('*').in('id', aIds.length > 0 ? aIds : ['00000000-0000-0000-0000-000000000000'])
-      const { data: eo } = await supabase.from('mkt_etiquetas').select('*').in('id', eIds.length > 0 ? eIds : ['00000000-0000-0000-0000-000000000000'])
+      const { data: au } = aIds.length > 0 ? await supabase.from('mkt_usuarios').select('*').in('id', aIds) : { data: [] }
+      const { data: eo } = eIds.length > 0 ? await supabase.from('mkt_etiquetas').select('*').in('id', eIds) : { data: [] }
       return { ...t, asignados: au || [], etiquetas: eo || [] }
     }))
     setTareas(completas)
+  }
+
+  async function fetchComentarios(tareaId: string) {
+    const { data } = await supabase.from('mkt_tarea_comentarios').select('*').eq('tarea_id', tareaId).order('creado_en', { ascending: true })
+    if (!data) return
+    const { data: us } = await supabase.from('mkt_usuarios').select('*')
+    const map = Object.fromEntries((us || []).map(u => [u.id, u]))
+    setComentarios(data.map(c => ({ ...c, autor: map[c.autor_id] })))
+  }
+
+  async function fetchAdjuntos(tareaId: string) {
+    const { data } = await supabase.from('mkt_tarea_adjuntos').select('*').eq('tarea_id', tareaId).order('creado_en', { ascending: false })
+    setAdjuntos(data || [])
+  }
+
+  async function agregarComentario() {
+    if (!nuevoComentario.trim() || !tareaDetalle || !usuario) return
+    await supabase.from('mkt_tarea_comentarios').insert({ tarea_id: tareaDetalle.id, autor_id: usuario.id, contenido: nuevoComentario })
+    await log(usuario.id, tareaDetalle.id, tareaDetalle.titulo, 'comentario_agregado')
+    setNuevoComentario('')
+    fetchComentarios(tareaDetalle.id)
+  }
+
+  async function subirAdjunto(file: File) {
+    if (!tareaDetalle || !usuario) return
+    setSubiendoAdjunto(true)
+    const ext = file.name.split('.').pop()
+    const path = `${tareaDetalle.id}/${Date.now()}.${ext}`
+    const { data: uploadData } = await supabase.storage.from('mkt-adjuntos').upload(path, file)
+    if (uploadData) {
+      const { data: urlData } = supabase.storage.from('mkt-adjuntos').getPublicUrl(path)
+      await supabase.from('mkt_tarea_adjuntos').insert({
+        tarea_id: tareaDetalle.id, nombre_archivo: file.name,
+        url: urlData.publicUrl, tipo: file.type, subido_por: usuario.id,
+      })
+      fetchAdjuntos(tareaDetalle.id)
+    }
+    setSubiendoAdjunto(false)
+  }
+
+  function abrirDetalle(tarea: Tarea) {
+    setTareaDetalle(tarea)
+    setTabDetalle('info')
+    fetchComentarios(tarea.id)
+    fetchAdjuntos(tarea.id)
   }
 
   async function crearTarea() {
@@ -168,15 +218,17 @@ export default function TareasPage() {
 
   if (!usuario) return null
 
+  const is = inputStyle
+
   return (
     <div>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-        <h1 style={{ fontSize: 'clamp(1.25rem, 4vw, 1.6rem)', fontWeight: 700, color: '#1a1a1a' }}>✅ Tareas</h1>
+        <h1 style={{ fontSize: 'clamp(1.25rem, 4vw, 1.6rem)', fontWeight: 700, color: 'var(--text)' }}>✅ Tareas</h1>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', border: '1.5px solid #e8e8e8', borderRadius: '8px', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', border: '1.5px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
             {(['kanban', 'lista'] as const).map(v => (
-              <button key={v} onClick={() => setVista(v)} style={{ padding: '0.375rem 0.75rem', border: 'none', backgroundColor: vista === v ? '#f15922' : '#fff', color: vista === v ? '#fff' : '#666', cursor: 'pointer', fontSize: '0.8rem', fontWeight: vista === v ? 600 : 400 }}>
+              <button key={v} onClick={() => setVista(v)} style={{ padding: '0.375rem 0.75rem', border: 'none', backgroundColor: vista === v ? '#f15922' : 'var(--bg-card)', color: vista === v ? '#fff' : 'var(--text-muted)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: vista === v ? 600 : 400 }}>
                 {v === 'kanban' ? '⬛ Kanban' : '☰ Lista'}
               </button>
             ))}
@@ -187,11 +239,11 @@ export default function TareasPage() {
 
       {/* Filtros */}
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
-        <select value={filtroEtiqueta} onChange={e => setFiltroEtiqueta(e.target.value)} style={{ padding: '0.375rem 0.625rem', border: '1.5px solid #e8e8e8', borderRadius: '8px', fontSize: '0.8rem', color: '#555', backgroundColor: '#fff' }}>
+        <select value={filtroEtiqueta} onChange={e => setFiltroEtiqueta(e.target.value)} style={{ ...is, width: 'auto', padding: '0.375rem 0.625rem' }}>
           <option value="">Todas las etiquetas</option>
           {etiquetas.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
         </select>
-        <select value={filtroUsuario} onChange={e => setFiltroUsuario(e.target.value)} style={{ padding: '0.375rem 0.625rem', border: '1.5px solid #e8e8e8', borderRadius: '8px', fontSize: '0.8rem', color: '#555', backgroundColor: '#fff' }}>
+        <select value={filtroUsuario} onChange={e => setFiltroUsuario(e.target.value)} style={{ ...is, width: 'auto', padding: '0.375rem 0.625rem' }}>
           <option value="">Todos los usuarios</option>
           {todosUsuarios.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
         </select>
@@ -206,18 +258,18 @@ export default function TareasPage() {
           {COLUMNAS.map(col => {
             const tareaCol = tareasFiltradas.filter(t => t.estado === col.key)
             return (
-              <div key={col.key} style={{ backgroundColor: col.bg, borderRadius: '12px', padding: '0.875rem', border: '1.5px solid #e8e8e8', minHeight: 150 }}>
+              <div key={col.key} style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', padding: '0.875rem', border: '1.5px solid var(--border)', minHeight: 150 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: col.color }} />
-                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#444', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{col.label}</span>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{col.label}</span>
                   </div>
-                  <span style={{ fontSize: '0.75rem', color: '#888', backgroundColor: '#fff', padding: '2px 8px', borderRadius: '99px', border: '1px solid #e8e8e8' }}>{tareaCol.length}</span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', backgroundColor: 'var(--bg)', padding: '2px 8px', borderRadius: '99px', border: '1px solid var(--border)' }}>{tareaCol.length}</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   {tareaCol.map(tarea => (
                     <TareaCard key={tarea.id} tarea={tarea} columnas={COLUMNAS} puedeEditar={puedeEditar(tarea)}
-                      onCambiarEstado={cambiarEstado} onEliminar={eliminarTarea} onEditar={abrirEditar} onVerDetalle={setTareaDetalle} />
+                      onCambiarEstado={cambiarEstado} onEliminar={eliminarTarea} onEditar={abrirEditar} onVerDetalle={abrirDetalle} />
                   ))}
                 </div>
               </div>
@@ -229,59 +281,117 @@ export default function TareasPage() {
       {/* LISTA */}
       {vista === 'lista' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {tareasFiltradas.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: '#888' }}>No hay tareas.</div>}
+          {tareasFiltradas.length === 0 && <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>No hay tareas.</div>}
           {tareasFiltradas.map(tarea => (
-            <div key={tarea.id} onClick={() => setTareaDetalle(tarea)} style={{ backgroundColor: '#fff', border: '1.5px solid #e8e8e8', borderRadius: '10px', padding: '0.875rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '0.7rem', fontWeight: 700, backgroundColor: PRIORIDAD[tarea.prioridad].bg, color: PRIORIDAD[tarea.prioridad].color, padding: '3px 10px', borderRadius: '99px', flexShrink: 0 }}>
-                {PRIORIDAD[tarea.prioridad].label}
-              </span>
-              <p style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1a1a1a', flex: 1, minWidth: 120 }}>{tarea.titulo}</p>
+            <div key={tarea.id} onClick={() => abrirDetalle(tarea)} style={{ backgroundColor: 'var(--bg-card)', border: '1.5px solid var(--border)', borderRadius: '10px', padding: '0.875rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.7rem', fontWeight: 700, backgroundColor: PRIORIDAD[tarea.prioridad].bg, color: PRIORIDAD[tarea.prioridad].color, padding: '3px 10px', borderRadius: '99px', flexShrink: 0 }}>{PRIORIDAD[tarea.prioridad].label}</span>
+              <p style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text)', flex: 1, minWidth: 120 }}>{tarea.titulo}</p>
               <div style={{ display: 'flex', gap: '0.25rem' }}>
                 {tarea.asignados.map(a => <span key={a.id} style={{ fontSize: '0.7rem', backgroundColor: a.avatar_color + '22', color: a.avatar_color, padding: '2px 8px', borderRadius: '99px', fontWeight: 600 }}>{a.nombre.split(' ')[0]}</span>)}
               </div>
-              <span style={{ fontSize: '0.75rem', color: '#888', whiteSpace: 'nowrap' }}>📅 {new Date(tarea.deadline + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>📅 {new Date(tarea.deadline + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}</span>
             </div>
           ))}
         </div>
       )}
 
-      {/* MODAL DETALLE */}
+      {/* MODAL DETALLE con comentarios y adjuntos */}
       {tareaDetalle && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}
           onClick={e => { if (e.target === e.currentTarget) setTareaDetalle(null) }}>
-          <div style={{ backgroundColor: '#fff', borderRadius: '16px', padding: '1.5rem', width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
-                  {tareaDetalle.etiquetas.map(e => <span key={e.id} style={{ fontSize: '0.65rem', fontWeight: 600, backgroundColor: e.color + '22', color: e.color, padding: '2px 8px', borderRadius: '4px' }}>{e.nombre}</span>)}
+          <div style={{ backgroundColor: 'var(--bg-card)', borderRadius: '16px', width: '100%', maxWidth: 580, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            {/* Header */}
+            <div style={{ padding: '1.5rem 1.5rem 1rem', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 700, backgroundColor: PRIORIDAD[tareaDetalle.prioridad].bg, color: PRIORIDAD[tareaDetalle.prioridad].color, padding: '2px 10px', borderRadius: '99px' }}>{PRIORIDAD[tareaDetalle.prioridad].label}</span>
+                    {tareaDetalle.etiquetas.map(e => <span key={e.id} style={{ fontSize: '0.65rem', fontWeight: 600, backgroundColor: e.color + '22', color: e.color, padding: '2px 8px', borderRadius: '4px' }}>{e.nombre}</span>)}
+                  </div>
+                  <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)', marginBottom: '0.25rem' }}>{tareaDetalle.titulo}</h2>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>📅 {new Date(tareaDetalle.deadline + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
                 </div>
-                <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1a1a1a', marginBottom: '0.5rem' }}>{tareaDetalle.titulo}</h2>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#888' }}>📅 {new Date(tareaDetalle.deadline + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })}</span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 700, backgroundColor: PRIORIDAD[tareaDetalle.prioridad].bg, color: PRIORIDAD[tareaDetalle.prioridad].color, padding: '2px 10px', borderRadius: '99px' }}>{PRIORIDAD[tareaDetalle.prioridad].label}</span>
+                <button onClick={() => setTareaDetalle(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>×</button>
+              </div>
+              {tareaDetalle.asignados.length > 0 && (
+                <div style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap' }}>
+                  {tareaDetalle.asignados.map(a => <span key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', backgroundColor: a.avatar_color + '22', color: a.avatar_color, padding: '3px 8px', borderRadius: '99px', fontSize: '0.75rem', fontWeight: 600 }}>{a.avatar_emoji} {a.nombre}</span>)}
                 </div>
-              </div>
-              <button onClick={() => setTareaDetalle(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: '#888' }}>×</button>
-            </div>
-            {tareaDetalle.descripcion && tareaDetalle.descripcion !== '<p></p>' && (
-              <div style={{ backgroundColor: '#f9fafb', borderRadius: '10px', padding: '1rem', marginBottom: '1rem' }}>
-                <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#888', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Descripción</p>
-                <RichContent html={tareaDetalle.descripcion} />
-              </div>
-            )}
-            {tareaDetalle.asignados.length > 0 && (
-              <div style={{ marginBottom: '1rem' }}>
-                <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#888', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Asignado a</p>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  {tareaDetalle.asignados.map(a => <span key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', backgroundColor: a.avatar_color + '22', color: a.avatar_color, padding: '4px 10px', borderRadius: '99px', fontSize: '0.8rem', fontWeight: 600 }}>{a.avatar_emoji} {a.nombre}</span>)}
-                </div>
-              </div>
-            )}
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              {puedeEditar(tareaDetalle) && (
-                <button onClick={() => abrirEditar(tareaDetalle)} style={{ flex: 1, padding: '0.625rem', border: '1.5px solid #e8e8e8', borderRadius: '8px', backgroundColor: '#fff', cursor: 'pointer', fontSize: '0.875rem', color: '#555' }}>✏️ Editar</button>
               )}
-              <button onClick={() => setTareaDetalle(null)} style={{ flex: 1, padding: '0.625rem', border: 'none', borderRadius: '8px', backgroundColor: '#f15922', color: '#fff', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600 }}>Cerrar</button>
+            </div>
+
+            {/* Tabs */}
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', padding: '0 1.5rem' }}>
+              {([['info', '📋 Info'], ['comentarios', `💬 Comentarios (${comentarios.length})`], ['adjuntos', `📎 Adjuntos (${adjuntos.length})`]] as const).map(([key, label]) => (
+                <button key={key} onClick={() => setTabDetalle(key)} style={{ padding: '0.625rem 1rem', border: 'none', backgroundColor: 'transparent', cursor: 'pointer', fontSize: '0.82rem', fontWeight: tabDetalle === key ? 700 : 400, color: tabDetalle === key ? '#f15922' : 'var(--text-muted)', borderBottom: tabDetalle === key ? '2px solid #f15922' : '2px solid transparent', marginBottom: '-1px' }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Contenido tab */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem 1.5rem' }}>
+              {tabDetalle === 'info' && (
+                <>
+                  {tareaDetalle.descripcion && tareaDetalle.descripcion !== '<p></p>' ? (
+                    <div style={{ backgroundColor: 'var(--bg)', borderRadius: '10px', padding: '1rem', marginBottom: '1rem' }}>
+                      <p style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Descripción</p>
+                      <RichContent html={tareaDetalle.descripcion} />
+                    </div>
+                  ) : (
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', fontStyle: 'italic' }}>Sin descripción.</p>
+                  )}
+                  {puedeEditar(tareaDetalle) && (
+                    <button onClick={() => abrirEditar(tareaDetalle)} style={{ marginTop: '1rem', padding: '0.5rem 1rem', border: '1.5px solid var(--border)', borderRadius: '8px', backgroundColor: 'var(--bg-card)', cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text)' }}>✏️ Editar tarea</button>
+                  )}
+                </>
+              )}
+
+              {tabDetalle === 'comentarios' && (
+                <div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
+                    {comentarios.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', textAlign: 'center', padding: '1rem' }}>Sin comentarios todavía.</p>}
+                    {comentarios.map(c => (
+                      <div key={c.id} style={{ display: 'flex', gap: '0.625rem' }}>
+                        {c.autor && <div style={{ width: 30, height: 30, borderRadius: '50%', backgroundColor: c.autor.avatar_color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', flexShrink: 0 }}>{c.autor.avatar_emoji}</div>}
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text)' }}>{c.autor?.nombre || 'Usuario'}</span>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{new Date(c.creado_en).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                          <div style={{ backgroundColor: 'var(--bg)', borderRadius: '8px', padding: '0.625rem 0.875rem', fontSize: '0.85rem', color: 'var(--text)', lineHeight: 1.5 }}>{c.contenido}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input value={nuevoComentario} onChange={e => setNuevoComentario(e.target.value)} onKeyDown={e => e.key === 'Enter' && !e.shiftKey && agregarComentario()} placeholder="Escribí un comentario..." style={{ ...is, flex: 1 }} />
+                    <button onClick={agregarComentario} style={{ padding: '0.5rem 1rem', backgroundColor: '#f15922', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.875rem' }}>Enviar</button>
+                  </div>
+                </div>
+              )}
+
+              {tabDetalle === 'adjuntos' && (
+                <div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
+                    {adjuntos.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', textAlign: 'center', padding: '1rem' }}>Sin adjuntos todavía.</p>}
+                    {adjuntos.map(a => (
+                      <a key={a.id} href={a.url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', backgroundColor: 'var(--bg)', borderRadius: '8px', textDecoration: 'none', border: '1.5px solid var(--border)' }}>
+                        <span style={{ fontSize: '1.25rem' }}>{a.tipo?.startsWith('image') ? '🖼️' : a.tipo?.includes('pdf') ? '📄' : '📎'}</span>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>{a.nombre_archivo}</p>
+                          <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{new Date(a.creado_en).toLocaleDateString('es-AR')}</p>
+                        </div>
+                        <span style={{ fontSize: '0.8rem', color: '#f15922', fontWeight: 600 }}>↗</span>
+                      </a>
+                    ))}
+                  </div>
+                  <label style={{ display: 'block', padding: '0.75rem 1rem', border: '2px dashed var(--border)', borderRadius: '10px', textAlign: 'center', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                    {subiendoAdjunto ? 'Subiendo...' : '+ Subir archivo'}
+                    <input type="file" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) subirAdjunto(f) }} />
+                  </label>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -289,66 +399,53 @@ export default function TareasPage() {
 
       {/* MODAL CREAR/EDITAR */}
       {modalOpen && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}
           onClick={e => { if (e.target === e.currentTarget) { setModalOpen(false); resetForm() } }}>
-          <div style={{ backgroundColor: '#fff', borderRadius: '16px', padding: '1.5rem', width: '100%', maxWidth: 560, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1.25rem', color: '#1a1a1a' }}>{editandoTarea ? 'Editar tarea' : 'Nueva tarea'}</h2>
-
-            <Campo label="Título *">
-              <input value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} placeholder="¿Qué hay que hacer?" style={inputStyle} />
-            </Campo>
-
-            <Campo label="Descripción">
-              <RichEditor value={form.descripcion} onChange={val => setForm(f => ({ ...f, descripcion: val }))} placeholder="Detalles, contexto, links..." minHeight={100} />
-            </Campo>
-
+          <div style={{ backgroundColor: 'var(--bg-card)', borderRadius: '16px', padding: '1.5rem', width: '100%', maxWidth: 560, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1.25rem', color: 'var(--text)' }}>{editandoTarea ? 'Editar tarea' : 'Nueva tarea'}</h2>
+            <Campo label="Título *"><input value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} placeholder="¿Qué hay que hacer?" style={is} /></Campo>
+            <Campo label="Descripción"><RichEditor value={form.descripcion} onChange={val => setForm(f => ({ ...f, descripcion: val }))} placeholder="Detalles, contexto, links..." minHeight={100} /></Campo>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <Campo label="Prioridad">
-                <select value={form.prioridad} onChange={e => setForm(f => ({ ...f, prioridad: e.target.value }))} style={inputStyle}>
+                <select value={form.prioridad} onChange={e => setForm(f => ({ ...f, prioridad: e.target.value }))} style={is}>
                   <option value="baja">🟢 Baja</option>
                   <option value="media">🟡 Media</option>
                   <option value="alta">🔴 Alta</option>
                 </select>
               </Campo>
-              <Campo label="Deadline *">
-                <input type="date" value={form.deadline} onChange={e => setForm(f => ({ ...f, deadline: e.target.value }))} style={inputStyle} />
-              </Campo>
+              <Campo label="Deadline *"><input type="date" value={form.deadline} onChange={e => setForm(f => ({ ...f, deadline: e.target.value }))} style={is} /></Campo>
             </div>
-
             {campanas.length > 0 && (
               <Campo label="Campaña">
-                <select value={form.campana_id} onChange={e => setForm(f => ({ ...f, campana_id: e.target.value }))} style={inputStyle}>
+                <select value={form.campana_id} onChange={e => setForm(f => ({ ...f, campana_id: e.target.value }))} style={is}>
                   <option value="">Sin campaña</option>
                   {campanas.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                 </select>
               </Campo>
             )}
-
             <Campo label="Asignar a">
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 {todosUsuarios.map(u => (
                   <button key={u.id} onClick={() => setForm(f => ({ ...f, asignados: f.asignados.includes(u.id) ? f.asignados.filter(id => id !== u.id) : [...f.asignados, u.id] }))}
-                    style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.375rem 0.75rem', borderRadius: '99px', border: form.asignados.includes(u.id) ? '2px solid #f15922' : '1.5px solid #e8e8e8', backgroundColor: form.asignados.includes(u.id) ? '#f9ddd3' : '#fff', cursor: 'pointer', fontSize: '0.8rem', color: '#1a1a1a' }}>
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.375rem 0.75rem', borderRadius: '99px', border: form.asignados.includes(u.id) ? '2px solid #f15922' : '1.5px solid var(--border)', backgroundColor: form.asignados.includes(u.id) ? '#f9ddd3' : 'var(--bg-card)', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--text)' }}>
                     {u.avatar_emoji} {u.nombre}
                   </button>
                 ))}
               </div>
             </Campo>
-
             <Campo label="Etiquetas">
               <div style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap' }}>
                 {etiquetas.map(e => (
                   <button key={e.id} onClick={() => setForm(f => ({ ...f, etiquetas: f.etiquetas.includes(e.id) ? f.etiquetas.filter(id => id !== e.id) : [...f.etiquetas, e.id] }))}
-                    style={{ padding: '0.25rem 0.625rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, border: form.etiquetas.includes(e.id) ? `2px solid ${e.color}` : '1.5px solid #e8e8e8', backgroundColor: form.etiquetas.includes(e.id) ? e.color + '22' : '#fff', color: form.etiquetas.includes(e.id) ? e.color : '#666', cursor: 'pointer' }}>
+                    style={{ padding: '0.25rem 0.625rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, border: form.etiquetas.includes(e.id) ? `2px solid ${e.color}` : '1.5px solid var(--border)', backgroundColor: form.etiquetas.includes(e.id) ? e.color + '22' : 'var(--bg-card)', color: form.etiquetas.includes(e.id) ? e.color : 'var(--text-muted)', cursor: 'pointer' }}>
                     {e.nombre}
                   </button>
                 ))}
-                <button onClick={() => setNuevaEtiquetaModal(true)} style={{ padding: '0.25rem 0.625rem', borderRadius: '4px', fontSize: '0.75rem', border: '1.5px dashed #e8e8e8', backgroundColor: '#fff', color: '#888', cursor: 'pointer' }}>+ Nueva</button>
+                <button onClick={() => setNuevaEtiquetaModal(true)} style={{ padding: '0.25rem 0.625rem', borderRadius: '4px', fontSize: '0.75rem', border: '1.5px dashed var(--border)', backgroundColor: 'var(--bg-card)', color: 'var(--text-muted)', cursor: 'pointer' }}>+ Nueva</button>
               </div>
             </Campo>
-
             <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
-              <button onClick={() => { setModalOpen(false); resetForm() }} style={{ flex: 1, padding: '0.625rem', border: '1.5px solid #e8e8e8', borderRadius: '8px', backgroundColor: '#fff', cursor: 'pointer', fontSize: '0.875rem', color: '#555' }}>Cancelar</button>
+              <button onClick={() => { setModalOpen(false); resetForm() }} style={{ flex: 1, padding: '0.625rem', border: '1.5px solid var(--border)', borderRadius: '8px', backgroundColor: 'var(--bg-card)', cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text)' }}>Cancelar</button>
               <button onClick={editandoTarea ? editarTarea : crearTarea} style={{ flex: 2, padding: '0.625rem', border: 'none', borderRadius: '8px', backgroundColor: '#f15922', color: '#fff', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600 }}>{editandoTarea ? 'Guardar cambios' : 'Crear tarea'}</button>
             </div>
           </div>
@@ -357,14 +454,14 @@ export default function TareasPage() {
 
       {/* MODAL HORAS */}
       {horasModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }}>
-          <div style={{ backgroundColor: '#fff', borderRadius: '16px', padding: '2rem', width: '100%', maxWidth: 360, boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }}>
+          <div style={{ backgroundColor: 'var(--bg-card)', borderRadius: '16px', padding: '2rem', width: '100%', maxWidth: 360, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
             <p style={{ fontSize: '1.5rem', textAlign: 'center', marginBottom: '0.5rem' }}>🎉</p>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, textAlign: 'center', marginBottom: '0.25rem' }}>¡Tarea completada!</h3>
-            <p style={{ fontSize: '0.85rem', color: '#888', textAlign: 'center', marginBottom: '1.5rem' }}>¿Cuántas horas le dedicaste? (opcional)</p>
-            <input type="number" min="0" step="0.5" value={horasValor} onChange={e => setHorasValor(e.target.value)} placeholder="Ej: 2.5" style={{ ...inputStyle, textAlign: 'center', marginBottom: '1rem' }} />
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, textAlign: 'center', marginBottom: '0.25rem', color: 'var(--text)' }}>¡Tarea completada!</h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '1.5rem' }}>¿Cuántas horas le dedicaste? (opcional)</p>
+            <input type="number" min="0" step="0.5" value={horasValor} onChange={e => setHorasValor(e.target.value)} placeholder="Ej: 2.5" style={{ ...is, textAlign: 'center', marginBottom: '1rem' }} />
             <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <button onClick={() => { setHorasModal(false); setHorasValor(''); setTareaCompletando(null) }} style={{ flex: 1, padding: '0.625rem', border: '1.5px solid #e8e8e8', borderRadius: '8px', backgroundColor: '#fff', cursor: 'pointer', fontSize: '0.875rem', color: '#555' }}>Omitir</button>
+              <button onClick={() => { setHorasModal(false); setHorasValor(''); setTareaCompletando(null) }} style={{ flex: 1, padding: '0.625rem', border: '1.5px solid var(--border)', borderRadius: '8px', backgroundColor: 'var(--bg-card)', cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text)' }}>Omitir</button>
               <button onClick={confirmarHoras} style={{ flex: 2, padding: '0.625rem', border: 'none', borderRadius: '8px', backgroundColor: '#10b981', color: '#fff', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600 }}>Confirmar</button>
             </div>
           </div>
@@ -373,13 +470,13 @@ export default function TareasPage() {
 
       {/* MODAL NUEVA ETIQUETA */}
       {nuevaEtiquetaModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: '1rem' }}>
-          <div style={{ backgroundColor: '#fff', borderRadius: '16px', padding: '1.5rem', width: '100%', maxWidth: 320, boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem' }}>Nueva etiqueta</h3>
-            <Campo label="Nombre"><input value={nuevaEtiqueta.nombre} onChange={e => setNuevaEtiqueta(n => ({ ...n, nombre: e.target.value }))} placeholder="Ej: SEO" style={inputStyle} /></Campo>
-            <Campo label="Color"><input type="color" value={nuevaEtiqueta.color} onChange={e => setNuevaEtiqueta(n => ({ ...n, color: e.target.value }))} style={{ width: '100%', height: 40, borderRadius: '8px', border: '1.5px solid #e8e8e8', cursor: 'pointer' }} /></Campo>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: '1rem' }}>
+          <div style={{ backgroundColor: 'var(--bg-card)', borderRadius: '16px', padding: '1.5rem', width: '100%', maxWidth: 320, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem', color: 'var(--text)' }}>Nueva etiqueta</h3>
+            <Campo label="Nombre"><input value={nuevaEtiqueta.nombre} onChange={e => setNuevaEtiqueta(n => ({ ...n, nombre: e.target.value }))} placeholder="Ej: SEO" style={is} /></Campo>
+            <Campo label="Color"><input type="color" value={nuevaEtiqueta.color} onChange={e => setNuevaEtiqueta(n => ({ ...n, color: e.target.value }))} style={{ width: '100%', height: 40, borderRadius: '8px', border: '1.5px solid var(--border)', cursor: 'pointer' }} /></Campo>
             <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
-              <button onClick={() => setNuevaEtiquetaModal(false)} style={{ flex: 1, padding: '0.5rem', border: '1.5px solid #e8e8e8', borderRadius: '8px', backgroundColor: '#fff', cursor: 'pointer', fontSize: '0.875rem' }}>Cancelar</button>
+              <button onClick={() => setNuevaEtiquetaModal(false)} style={{ flex: 1, padding: '0.5rem', border: '1.5px solid var(--border)', borderRadius: '8px', backgroundColor: 'var(--bg-card)', cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text)' }}>Cancelar</button>
               <button onClick={crearEtiqueta} style={{ flex: 2, padding: '0.5rem', border: 'none', borderRadius: '8px', backgroundColor: '#f15922', color: '#fff', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600 }}>Crear</button>
             </div>
           </div>
@@ -401,21 +498,20 @@ function TareaCard({ tarea, columnas, puedeEditar, onCambiarEstado, onEliminar, 
   const p = PRIORIDAD[tarea.prioridad]
 
   return (
-    <div style={{ backgroundColor: '#fff', border: `1.5px solid ${vencida ? '#fecaca' : '#e8e8e8'}`, borderRadius: '10px', padding: '0.875rem', cursor: 'pointer', transition: 'box-shadow 0.15s' }}
-      onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'}
+    <div style={{ backgroundColor: 'var(--bg-card)', border: `1.5px solid ${vencida ? '#fecaca' : 'var(--border)'}`, borderRadius: '10px', padding: '0.875rem', cursor: 'pointer', transition: 'box-shadow 0.15s' }}
+      onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'}
       onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
       onClick={() => onVerDetalle(tarea)}>
-      {/* Prioridad badge */}
       <div style={{ marginBottom: '0.5rem' }}>
         <span style={{ fontSize: '0.65rem', fontWeight: 700, backgroundColor: p.bg, color: p.color, padding: '3px 8px', borderRadius: '99px' }}>{p.label}</span>
       </div>
-      <p style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1a1a1a', marginBottom: '0.5rem', lineHeight: 1.3 }}>{tarea.titulo}</p>
+      <p style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text)', marginBottom: '0.5rem', lineHeight: 1.3 }}>{tarea.titulo}</p>
       {tarea.etiquetas.length > 0 && (
         <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
           {tarea.etiquetas.map(e => <span key={e.id} style={{ fontSize: '0.6rem', fontWeight: 600, backgroundColor: e.color + '22', color: e.color, padding: '2px 6px', borderRadius: '4px' }}>{e.nombre}</span>)}
         </div>
       )}
-      <p style={{ fontSize: '0.7rem', color: vencida ? '#ef4444' : proxima ? '#f59e0b' : '#888', marginBottom: tarea.asignados.length > 0 ? '0.5rem' : '0' }}>
+      <p style={{ fontSize: '0.7rem', color: vencida ? '#ef4444' : proxima ? '#f59e0b' : 'var(--text-muted)', marginBottom: tarea.asignados.length > 0 ? '0.5rem' : '0' }}>
         📅 {new Date(tarea.deadline + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
         {vencida && ' · Vencida'}{proxima && !vencida && ' · Próxima'}
       </p>
@@ -425,10 +521,10 @@ function TareaCard({ tarea, columnas, puedeEditar, onCambiarEstado, onEliminar, 
         </div>
       )}
       {puedeEditar && (
-        <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #f4f4f4' }} onClick={e => e.stopPropagation()}>
-          <button onClick={() => onEditar(tarea)} style={{ fontSize: '0.65rem', padding: '3px 8px', borderRadius: '4px', border: '1px solid #e8e8e8', backgroundColor: '#f9fafb', color: '#555', cursor: 'pointer' }}>✏️ Editar</button>
+        <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
+          <button onClick={() => onEditar(tarea)} style={{ fontSize: '0.65rem', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border)', backgroundColor: 'var(--bg)', color: 'var(--text)', cursor: 'pointer' }}>✏️ Editar</button>
           {columnas.filter(c => c.key !== tarea.estado).map(c => (
-            <button key={c.key} onClick={() => onCambiarEstado(tarea, c.key)} style={{ fontSize: '0.65rem', padding: '3px 8px', borderRadius: '4px', border: '1px solid #e8e8e8', backgroundColor: '#f9fafb', color: '#555', cursor: 'pointer' }}>→ {c.label}</button>
+            <button key={c.key} onClick={() => onCambiarEstado(tarea, c.key)} style={{ fontSize: '0.65rem', padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border)', backgroundColor: 'var(--bg)', color: 'var(--text)', cursor: 'pointer' }}>→ {c.label}</button>
           ))}
           <button onClick={() => onEliminar(tarea)} style={{ fontSize: '0.65rem', padding: '3px 8px', borderRadius: '4px', border: '1px solid #fecaca', backgroundColor: '#fef2f2', color: '#ef4444', cursor: 'pointer', marginLeft: 'auto' }}>✕</button>
         </div>
@@ -440,13 +536,15 @@ function TareaCard({ tarea, columnas, puedeEditar, onCambiarEstado, onEliminar, 
 function Campo({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: '1rem' }}>
-      <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#555', display: 'block', marginBottom: '0.375rem' }}>{label}</label>
+      <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: '0.375rem' }}>{label}</label>
       {children}
     </div>
   )
 }
 
 const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '0.625rem 0.875rem', border: '1.5px solid #e8e8e8',
-  borderRadius: '8px', fontSize: '0.875rem', outline: 'none', color: '#1a1a1a', backgroundColor: '#fff',
+  width: '100%', padding: '0.625rem 0.875rem',
+  border: '1.5px solid var(--border)', borderRadius: '8px',
+  fontSize: '0.875rem', outline: 'none',
+  color: 'var(--text)', backgroundColor: 'var(--input-bg)',
 }
