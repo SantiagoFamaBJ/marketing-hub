@@ -70,7 +70,7 @@ export default function HomePage() {
       ) : usuarios.length === 0 ? (
         <div style={{ textAlign: 'center', color: '#888' }}>
           <p style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>No hay usuarios creados todavía.</p>
-          <p style={{ fontSize: '0.85rem' }}>Entrá a <a href="/admin" style={{ color: '#f15922' }}>/admin</a> para crear uno.</p>
+          <p style={{ fontSize: '0.85rem' }}>Entrá a <a href="/ADMIN" style={{ color: '#f15922' }}>/ADMIN</a> para crear uno.</p>
         </div>
       ) : (
         <div style={{
