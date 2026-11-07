@@ -4,121 +4,69 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
-type Usuario = {
-  id: string
-  nombre: string
-  slug: string
-  avatar_color: string
-  avatar_emoji: string
-  rol: string
-}
+const inp: React.CSSProperties = { width: '100%', padding: '0.7rem 0.9rem', border: '1.5px solid #e8e8e8', borderRadius: 10, fontSize: '0.95rem', outline: 'none', color: '#1a1a1a', backgroundColor: '#fff' }
 
 export default function HomePage() {
-  const [usuarios, setUsuarios] = useState<Usuario[]>([])
-  const [loading, setLoading] = useState(true)
+  const [email, setEmail] = useState('')
+  const [pass, setPass] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [revisando, setRevisando] = useState(true)
   const router = useRouter()
 
+  // Si ya hay sesión en esta pestaña, entrar directo
   useEffect(() => {
-    fetchUsuarios()
+    (async () => {
+      const { data } = await supabase.auth.getSession()
+      if (data.session) {
+        const u = await perfil()
+        if (u) { router.replace(`/u/${u.slug}`); return }
+      }
+      setRevisando(false)
+    })()
   }, [])
 
-  async function fetchUsuarios() {
-    const { data } = await supabase
-      .from('mkt_usuarios')
-      .select('*')
-      .eq('activo', true)
-      .neq('slug', 'admin')
-      .order('creado_en', { ascending: true })
-    setUsuarios(data || [])
-    setLoading(false)
+  async function perfil() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
+    const { data } = await supabase.from('mkt_usuarios').select('*').eq('auth_user_id', user.id).eq('activo', true).maybeSingle()
+    if (!data) { await supabase.auth.signOut(); sessionStorage.removeItem('mkt_usuario'); return null }
+    sessionStorage.setItem('mkt_usuario', JSON.stringify(data))
+    return data
   }
 
-  function handleSelect(usuario: Usuario) {
-    sessionStorage.setItem('mkt_usuario', JSON.stringify(usuario))
-    router.push(`/u/${usuario.slug}`)
+  async function entrar(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true); setError('')
+    const { error: err } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password: pass })
+    if (err) { setError('Email o contraseña incorrectos.'); setLoading(false); return }
+    const u = await perfil()
+    if (!u) { setError('Tu usuario no tiene acceso al Marketing Hub.'); setLoading(false); return }
+    router.push(`/u/${u.slug}`)
   }
+
+  if (revisando) return <div style={{ minHeight: '100vh', backgroundColor: '#fafafa' }} />
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      backgroundColor: '#fafafa',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '2rem',
-    }}>
-
-      {/* Logo */}
-      <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#fafafa', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+      <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: '10px',
-            backgroundColor: '#f15922',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem',
-          }}>🦷</div>
-          <span style={{ fontSize: '1.4rem', fontWeight: 700, color: '#1a1a1a', letterSpacing: '-0.02em' }}>
-            Dental Medrano
-          </span>
+          <div style={{ width: 40, height: 40, borderRadius: '10px', backgroundColor: '#f15922', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>🦷</div>
+          <span style={{ fontSize: '1.4rem', fontWeight: 700, color: '#1a1a1a', letterSpacing: '-0.02em' }}>Dental Medrano</span>
         </div>
-        <p style={{ fontSize: '0.95rem', color: '#666' }}>Marketing Hub — ¿Quién sos?</p>
+        <p style={{ fontSize: '0.95rem', color: '#666' }}>Marketing Hub</p>
       </div>
 
-      {/* Cards */}
-      {loading ? (
-        <div style={{ color: '#a0a0a0', fontSize: '0.9rem' }}>Cargando...</div>
-      ) : usuarios.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#888' }}>
-          <p style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>No hay usuarios creados todavía.</p>
-          <p style={{ fontSize: '0.85rem' }}>Entrá a <a href="/ADMIN" style={{ color: '#f15922' }}>/ADMIN</a> para crear uno.</p>
-        </div>
-      ) : (
-        <div style={{
-          display: 'flex', gap: '1.5rem', flexWrap: 'wrap',
-          justifyContent: 'center', maxWidth: '700px',
-        }}>
-          {usuarios.map((u, i) => (
-            <button
-              key={u.id}
-              onClick={() => handleSelect(u)}
-              style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.875rem',
-                padding: '2rem 1.75rem',
-                backgroundColor: '#ffffff',
-                border: '1.5px solid #e8e8e8',
-                borderRadius: '16px',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                minWidth: '140px',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.borderColor = '#f15922'
-                e.currentTarget.style.transform = 'translateY(-4px)'
-                e.currentTarget.style.boxShadow = '0 12px 32px rgba(241,89,34,0.12)'
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.borderColor = '#e8e8e8'
-                e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = 'none'
-              }}
-            >
-              <div style={{
-                width: 72, height: 72, borderRadius: '50%',
-                backgroundColor: u.avatar_color,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem',
-              }}>
-                {u.avatar_emoji}
-              </div>
-              <p style={{ fontSize: '1rem', fontWeight: 600, color: '#1a1a1a' }}>{u.nombre}</p>
-            </button>
-          ))}
-        </div>
-      )}
+      <form onSubmit={entrar} style={{ width: '100%', maxWidth: 340, backgroundColor: '#fff', border: '1.5px solid #e8e8e8', borderRadius: 16, padding: '1.5rem' }}>
+        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#555', display: 'block', marginBottom: 6 }}>Email</label>
+        <input type="email" autoComplete="username" required value={email} onChange={e => setEmail(e.target.value)} style={{ ...inp, marginBottom: 14 }} />
+        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#555', display: 'block', marginBottom: 6 }}>Contraseña</label>
+        <input type="password" autoComplete="current-password" required value={pass} onChange={e => setPass(e.target.value)} style={{ ...inp, marginBottom: 14 }} />
+        {error && <p role="alert" style={{ fontSize: '0.82rem', color: '#ef4444', marginBottom: 12 }}>{error}</p>}
+        <button type="submit" disabled={loading} style={{ width: '100%', padding: '0.75rem', border: 'none', borderRadius: 10, backgroundColor: '#f15922', color: '#fff', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer', opacity: loading ? 0.7 : 1 }}>{loading ? 'Entrando…' : 'Entrar'}</button>
+      </form>
 
-      {/* Footer */}
-      <p style={{ marginTop: '3rem', fontSize: '0.75rem', color: '#c0c0c0' }}>
-        Marketing Hub · Dental Medrano © {new Date().getFullYear()}
-      </p>
+      <p style={{ marginTop: '2rem', fontSize: '0.75rem', color: '#c0c0c0' }}>Marketing Hub · Dental Medrano © {new Date().getFullYear()}</p>
     </div>
   )
 }

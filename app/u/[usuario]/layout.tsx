@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter, usePathname, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { cargarPermisos, Permisos, rolCorto, NOTIF_TIPOS, estadoInfo } from '@/lib/tareas'
@@ -39,16 +39,32 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
   const busquedaRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const pathname = usePathname()
+  const params = useParams() as { usuario?: string }
+
+  const [pwOpen, setPwOpen] = useState(false)
+  const [pw1, setPw1] = useState(''); const [pw2, setPw2] = useState(''); const [pwMsg, setPwMsg] = useState('')
+  async function cerrarSesion() { await supabase.auth.signOut(); sessionStorage.removeItem('mkt_usuario'); router.push('/') }
+  async function cambiarPass() {
+    if (pw1.length < 8) return setPwMsg('Mínimo 8 caracteres.')
+    if (pw1 !== pw2) return setPwMsg('Las contraseñas no coinciden.')
+    const { error } = await supabase.auth.updateUser({ password: pw1 })
+    if (error) return setPwMsg(error.message)
+    setPwMsg('✅ Contraseña actualizada.'); setPw1(''); setPw2('')
+  }
 
   useEffect(() => {
     const stored = sessionStorage.getItem('mkt_usuario')
     if (!stored) { router.push('/'); return }
     const u = JSON.parse(stored)
     setUsuario(u)
-    // Acceso desactivado → afuera (los datos se conservan)
-    supabase.from('mkt_usuarios').select('activo').eq('id', u.id).maybeSingle().then(({ data }) => {
-      if (data && data.activo === false) { sessionStorage.removeItem('mkt_usuario'); router.push('/') }
-    })
+    // La sesión real (Supabase Auth) manda: sin sesión o con acceso desactivado → afuera. Los datos se conservan.
+    ;(async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: p } = user ? await supabase.from('mkt_usuarios').select('*').eq('auth_user_id', user.id).eq('activo', true).maybeSingle() : { data: null }
+      if (!p) { await supabase.auth.signOut(); sessionStorage.removeItem('mkt_usuario'); router.push('/'); return }
+      sessionStorage.setItem('mkt_usuario', JSON.stringify(p)); setUsuario(p)
+      if (params?.usuario && params.usuario !== p.slug) router.replace(`/u/${p.slug}`)
+    })()
     fetchNotificaciones(u.id)
     fetchTareasVencidas(u.id)
     cargarPermisos(u.rol).then(setPermisos)
@@ -198,7 +214,8 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ fontSize: '0.8rem', fontWeight: 600, color: c.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{usuario.nombre}</p>
             </div>
-            <button onClick={() => { sessionStorage.removeItem('mkt_usuario'); router.push('/') }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', padding: '4px', borderRadius: '6px', color: c.textMuted }}>↩</button>
+            <button onClick={() => { setPwMsg(''); setPwOpen(true) }} title="Cambiar contraseña" aria-label="Cambiar contraseña" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', padding: '4px', color: c.textMuted }}>🔑</button>
+            <button onClick={cerrarSesion} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', padding: '4px', borderRadius: '6px', color: c.textMuted }}>↩</button>
           </div>
         </div>
       </aside>
@@ -222,7 +239,8 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
             <p style={{ fontSize: '0.8rem', fontWeight: 600, color: c.text }}>{usuario.nombre}</p>
           </div>
           <button onClick={() => setDarkMode(!darkMode)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.1rem', color: c.textMuted }}>{darkMode ? '☀️' : '🌙'}</button>
-          <button onClick={() => { sessionStorage.removeItem('mkt_usuario'); router.push('/') }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', color: c.textMuted }}>↩</button>
+          <button onClick={() => { setPwMsg(''); setPwOpen(true) }} title="Cambiar contraseña" aria-label="Cambiar contraseña" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', padding: '4px', color: c.textMuted }}>🔑</button>
+            <button onClick={cerrarSesion} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', color: c.textMuted }}>↩</button>
         </div>
       </aside>
 
@@ -333,6 +351,21 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
             )}
           </div>
         </>
+      )}
+
+            {pwOpen && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '1rem' }} onClick={e => { if (e.target === e.currentTarget) setPwOpen(false) }}>
+          <div style={{ backgroundColor: c.sidebar, borderRadius: 16, padding: '1.25rem', width: '100%', maxWidth: 360 }}>
+            <h2 style={{ fontSize: '1.05rem', fontWeight: 700, color: c.text, marginBottom: 12 }}>🔑 Cambiar contraseña</h2>
+            <input type="password" autoComplete="new-password" placeholder="Nueva contraseña (mín. 8)" value={pw1} onChange={e => setPw1(e.target.value)} style={{ width: '100%', padding: '0.6rem 0.8rem', border: `1.5px solid ${c.border}`, borderRadius: 8, marginBottom: 8, backgroundColor: 'var(--input-bg)', color: c.text }} />
+            <input type="password" autoComplete="new-password" placeholder="Repetir contraseña" value={pw2} onChange={e => setPw2(e.target.value)} style={{ width: '100%', padding: '0.6rem 0.8rem', border: `1.5px solid ${c.border}`, borderRadius: 8, marginBottom: 8, backgroundColor: 'var(--input-bg)', color: c.text }} />
+            {pwMsg && <p style={{ fontSize: '0.82rem', color: pwMsg.startsWith('✅') ? '#10b981' : '#ef4444', marginBottom: 8 }}>{pwMsg}</p>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setPwOpen(false)} style={{ flex: 1, padding: '0.55rem', border: `1.5px solid ${c.border}`, borderRadius: 8, background: 'transparent', color: c.text, cursor: 'pointer' }}>Cerrar</button>
+              <button onClick={cambiarPass} style={{ flex: 1, padding: '0.55rem', border: 'none', borderRadius: 8, backgroundColor: '#f15922', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Guardar</button>
+            </div>
+          </div>
+        </div>
       )}
 
       <style>{`

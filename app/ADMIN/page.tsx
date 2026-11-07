@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { cargarTareas, ROLES, PERMISOS, ESTADOS, estadoInfo, estaCerrada } from '@/lib/tareas'
 
-type Usuario = { id: string; nombre: string; slug: string; avatar_color: string; avatar_emoji: string; rol: string; activo: boolean }
+type Usuario = { id: string; nombre: string; slug: string; avatar_color: string; avatar_emoji: string; rol: string; activo: boolean; auth_user_id?: string | null }
 type Plantilla = { id: string; nombre: string; categoria: string; contenido: string; variables: any[]; activa: boolean }
 type Etiqueta = { id: string; nombre: string; color: string; es_predeterminada: boolean }
 type Manual = { id: string; titulo: string; descripcion: string | null; categoria: string; tipo: string; url: string | null; nombre_archivo: string | null; activo: boolean }
@@ -34,6 +34,30 @@ function Campo({ label, children }: { label: string; children: React.ReactNode }
 type Tab = 'usuarios' | 'reportes' | 'plantillas' | 'etiquetas' | 'manuales' | 'tareas'
 
 export default function AdminPage() {
+  const [ok, setOk] = useState<null | boolean>(null)
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return setOk(false)
+      const { data } = await supabase.from('mkt_usuarios').select('rol').eq('auth_user_id', user.id).eq('activo', true).maybeSingle()
+      setOk(data?.rol === 'mkt_reporte')
+    })()
+  }, [])
+  if (ok === null) return null
+  if (!ok) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', backgroundColor: '#fafafa' }}>
+      <div style={{ textAlign: 'center', maxWidth: 360 }}>
+        <p style={{ fontSize: '2rem' }}>🔒</p>
+        <p style={{ fontWeight: 700, color: '#1a1a1a', marginBottom: 6 }}>Entrá primero con tu usuario de coordinación</p>
+        <p style={{ fontSize: '0.85rem', color: '#888', marginBottom: 16 }}>El admin necesita que hayas iniciado sesión en el Marketing Hub.</p>
+        <a href="/" style={{ color: '#f15922', fontWeight: 600 }}>Ir al login</a>
+      </div>
+    </div>
+  )
+  return <AdminInner />
+}
+
+function AdminInner() {
   const [tab, setTab] = useState<Tab>('usuarios')
   const router = useRouter()
 
@@ -41,6 +65,7 @@ export default function AdminPage() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [modalUsuario, setModalUsuario] = useState(false)
   const [editandoUsuario, setEditandoUsuario] = useState<Usuario | null>(null)
+  const [acc, setAcc] = useState({ email: '', password: '', msg: '', cargando: false })
   const [formUsuario, setFormUsuario] = useState({ nombre:'', slug:'', avatar_color:'#f15922', avatar_emoji:'😊', rol:'mkt', es_pasante: false })
 
   // Plantillas
@@ -105,6 +130,17 @@ export default function AdminPage() {
   }
 
   // USUARIOS
+  async function darAcceso() {
+    if (!editandoUsuario) return
+    setAcc(a => ({ ...a, cargando: true, msg: '' }))
+    const { data, error } = await supabase.functions.invoke('mkt-admin-usuarios', { body: { accion: 'dar_acceso', usuario_id: editandoUsuario.id, email: acc.email, password: acc.password } })
+    let msg = '✅ Acceso listo. Pasale el email y la contraseña a la persona (después se la puede cambiar con el 🔑).'
+    if (error || data?.error) {
+      msg = '❌ ' + (data?.error || (await (error as any)?.context?.json?.().then((j: any) => j.error).catch(() => null)) || error?.message || 'No se pudo')
+    }
+    setAcc({ email: acc.email, password: '', msg, cargando: false })
+    fetchUsuarios()
+  }
   async function guardarUsuario() {
     if (!formUsuario.nombre.trim()) return
     setLoading(true)
@@ -241,12 +277,13 @@ export default function AdminPage() {
                       <span style={{ fontSize: '0.65rem', fontWeight: 600, color: u.rol === 'mkt_reporte' ? '#f15922' : '#3b82f6', backgroundColor: u.rol === 'mkt_reporte' ? '#f9ddd3' : '#eff6ff', padding: '2px 8px', borderRadius: '99px', textTransform: 'uppercase' }}>
                         {ROLES[u.rol]?.split(' (')[0] || u.rol}
                       </span>
+                      {!u.auth_user_id && <span style={{ fontSize: '0.65rem', color: '#b45309', backgroundColor: '#fffbeb', padding: '2px 8px', borderRadius: '99px' }}>sin acceso</span>}
                       {!u.activo && <span style={{ fontSize: '0.65rem', color: '#888', backgroundColor: '#f4f4f4', padding: '2px 8px', borderRadius: '99px' }}>inactivo</span>}
                     </div>
                     <p style={{ fontSize: '0.75rem', color: '#a0a0a0', marginTop: '2px' }}>/{u.slug}</p>
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <button onClick={() => { setEditandoUsuario(u); setFormUsuario({ nombre: u.nombre, slug: u.slug, avatar_color: u.avatar_color, avatar_emoji: u.avatar_emoji, rol: u.rol, es_pasante: !!(u as any).es_pasante }); setModalUsuario(true) }} style={{ background: '#f4f4f4', border: 'none', borderRadius: '8px', padding: '0.375rem 0.75rem', cursor: 'pointer', fontSize: '0.8rem', color: '#444' }}>Editar</button>
+                    <button onClick={() => { setEditandoUsuario(u); setFormUsuario({ nombre: u.nombre, slug: u.slug, avatar_color: u.avatar_color, avatar_emoji: u.avatar_emoji, rol: u.rol, es_pasante: !!(u as any).es_pasante }); setAcc({ email: '', password: '', msg: '', cargando: false }); setModalUsuario(true) }} style={{ background: '#f4f4f4', border: 'none', borderRadius: '8px', padding: '0.375rem 0.75rem', cursor: 'pointer', fontSize: '0.8rem', color: '#444' }}>Editar</button>
                     <button onClick={() => toggleActivoUsuario(u)} style={{ background: u.activo ? '#fffbeb' : '#f0fdf4', border: 'none', borderRadius: '8px', padding: '0.375rem 0.75rem', cursor: 'pointer', fontSize: '0.8rem', color: u.activo ? '#f59e0b' : '#10b981' }}>{u.activo ? 'Desactivar' : 'Activar'}</button>
                   </div>
                 </div>
@@ -371,12 +408,12 @@ export default function AdminPage() {
               <div style={{ width: 72, height: 72, borderRadius: '50%', backgroundColor: formUsuario.avatar_color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>{formUsuario.avatar_emoji}</div>
             </div>
             <Campo label="Nombre">
-              <input value={formUsuario.nombre} onChange={e => setFormUsuario(f => ({ ...f, nombre: e.target.value, slug: slugify(e.target.value) }))} placeholder="Ej: Julieta García" style={inputStyle} />
+              <input value={formUsuario.nombre} onChange={e => setFormUsuario(f => ({ ...f, nombre: e.target.value, ...(editandoUsuario ? {} : { slug: slugify(e.target.value) }) }))} placeholder="Ej: Julieta García" style={inputStyle} />
             </Campo>
             <Campo label="URL del perfil">
               <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid #e8e8e8', borderRadius: '8px', overflow: 'hidden' }}>
                 <span style={{ padding: '0.625rem 0.75rem', backgroundColor: '#f4f4f4', color: '#888', fontSize: '0.8rem', borderRight: '1px solid #e8e8e8' }}>/</span>
-                <input value={formUsuario.slug} onChange={e => setFormUsuario(f => ({ ...f, slug: slugify(e.target.value) }))} style={{ flex: 1, padding: '0.625rem 0.75rem', border: 'none', fontSize: '0.875rem', outline: 'none', color: '#1a1a1a' }} />
+                <input value={formUsuario.slug} disabled={!!editandoUsuario} onChange={e => setFormUsuario(f => ({ ...f, slug: slugify(e.target.value) }))} style={{ flex: 1, padding: '0.625rem 0.75rem', border: 'none', fontSize: '0.875rem', outline: 'none', color: '#1a1a1a' }} />
               </div>
             </Campo>
             <Campo label="Rol">
@@ -384,6 +421,14 @@ export default function AdminPage() {
                 {Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </Campo>
+            {editandoUsuario && (
+              <Campo label={editandoUsuario.auth_user_id ? 'Acceso (ya tiene) — cambiar email o contraseña' : 'Acceso al Hub (todavía no tiene)'}>
+                <input type="email" value={acc.email} onChange={e => setAcc(a => ({ ...a, email: e.target.value }))} placeholder="Email con el que va a entrar" style={{ ...inputStyle, marginBottom: 6 }} />
+                <input type="text" value={acc.password} onChange={e => setAcc(a => ({ ...a, password: e.target.value }))} placeholder="Contraseña inicial (mín. 8)" style={{ ...inputStyle, marginBottom: 6 }} />
+                <button type="button" onClick={darAcceso} disabled={acc.cargando || !acc.email || acc.password.length < 8} style={{ padding: '0.5rem 0.9rem', border: 'none', borderRadius: 8, backgroundColor: '#f15922', color: '#fff', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer', opacity: acc.cargando || !acc.email || acc.password.length < 8 ? 0.6 : 1 }}>{acc.cargando ? 'Guardando…' : editandoUsuario.auth_user_id ? 'Actualizar acceso' : 'Dar acceso'}</button>
+                {acc.msg && <p style={{ fontSize: '0.78rem', marginTop: 6, color: acc.msg.startsWith('✅') ? '#10b981' : '#ef4444' }}>{acc.msg}</p>}
+              </Campo>
+            )}
             <Campo label="Pasantía">
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', cursor: 'pointer' }}>
                 <input type="checkbox" checked={formUsuario.es_pasante} onChange={e => setFormUsuario(f => ({ ...f, es_pasante: e.target.checked }))} style={{ accentColor: '#f15922' }} /> Es pasante (aparece en Reportes → Pasante)

@@ -12,16 +12,24 @@ const pesos = (n: number) => n.toLocaleString('es-AR', { style: 'currency', curr
 function Presupuestos() {
   const [camps, setCamps] = useState<any[]>([])
   const [vals, setVals] = useState<Record<string, string>>({})
-  useEffect(() => { supabase.from('mkt_campanas').select('id,nombre,presupuesto,estado').order('creado_en', { ascending: false }).then(({ data }) => { setCamps(data || []); setVals(Object.fromEntries((data || []).map((c: any) => [c.id, c.presupuesto != null ? String(c.presupuesto) : '']))) }) }, [])
+  useEffect(() => {
+    Promise.all([supabase.from('mkt_campanas').select('id,nombre').order('creado_en', { ascending: false }), supabase.from('mkt_presupuestos').select('*')]).then(([c, p]) => {
+      const m: Record<string, number | null> = Object.fromEntries((p.data || []).map((x: any) => [x.campana_id, x.monto]))
+      setCamps((c.data || []).map((x: any) => ({ ...x, presupuesto: m[x.id] ?? null })))
+      setVals(Object.fromEntries((c.data || []).map((x: any) => [x.id, m[x.id] != null ? String(m[x.id]) : ''])))
+    })
+  }, [])
   async function guardar(id: string) {
-    await supabase.from('mkt_campanas').update({ presupuesto: vals[id] ? parseFloat(vals[id]) : null }).eq('id', id)
-    setCamps(cs => cs.map(c => c.id === id ? { ...c, presupuesto: vals[id] ? parseFloat(vals[id]) : null } : c))
+    const monto = vals[id] ? parseFloat(vals[id]) : null
+    if (monto == null) await supabase.from('mkt_presupuestos').delete().eq('campana_id', id)
+    else await supabase.from('mkt_presupuestos').upsert({ campana_id: id, monto, actualizado_en: new Date().toISOString() })
+    setCamps(cs => cs.map(c => c.id === id ? { ...c, presupuesto: monto } : c))
   }
   const total = camps.reduce((a, c) => a + (c.presupuesto || 0), 0)
   return (
     <div style={{ backgroundColor: 'var(--bg-card)', border: '1.5px solid var(--border)', borderRadius: 12, padding: '1rem' }}>
       <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>💰 Presupuesto por campaña</h3>
-      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 12 }}>Solo se ve y se edita acá. Total cargado: {pesos(total)}</p>
+      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 12 }}>Solo coordinación lo ve y edita (protegido en la base de datos). Total cargado: {pesos(total)}</p>
       {camps.length === 0 && <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No hay campañas.</p>}
       {camps.map(c => (
         <div key={c.id} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '0.45rem 0', borderTop: '1px solid var(--border)', flexWrap: 'wrap' }}>

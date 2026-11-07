@@ -9,7 +9,7 @@ import TareaForm from '@/components/TareaForm'
 
 type Campana = {
   id: string; nombre: string; descripcion: string | null; color: string; fecha_inicio: string | null; fecha_fin: string | null; estado: string
-  creado_por: string | null; objetivo: string | null; responsable_id: string | null; presupuesto: number | null; resultados: string | null
+  creado_por: string | null; objetivo: string | null; responsable_id: string | null; resultados: string | null
 }
 type Archivo = { id: string; nombre_archivo: string; url: string; tipo: string | null; creado_en: string }
 
@@ -36,7 +36,7 @@ export default function CampanasPage() {
   const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([])
   const [filtro, setFiltro] = useState<'vigentes' | 'todas'>('vigentes')
   const [editando, setEditando] = useState<Campana | 'nueva' | null>(null)
-  const [form, setForm] = useState({ nombre: '', descripcion: '', objetivo: '', color: '#f15922', fecha_inicio: '', fecha_fin: '', estado: 'activa', responsable_id: '', presupuesto: '' })
+  const [form, setForm] = useState({ nombre: '', descripcion: '', objetivo: '', color: '#f15922', fecha_inicio: '', fecha_fin: '', estado: 'activa', responsable_id: '' })
   const [abierta, setAbierta] = useState<Campana | null>(null)
   const [tab, setTab] = useState<'resumen' | 'tareas' | 'archivos'>('resumen')
   const [archivos, setArchivos] = useState<Archivo[]>([])
@@ -67,8 +67,8 @@ export default function CampanasPage() {
 
   function abrirForm(c: Campana | 'nueva') {
     setEditando(c)
-    if (c === 'nueva') setForm({ nombre: '', descripcion: '', objetivo: '', color: '#f15922', fecha_inicio: '', fecha_fin: '', estado: 'activa', responsable_id: usuario?.id || '', presupuesto: '' })
-    else setForm({ nombre: c.nombre, descripcion: c.descripcion || '', objetivo: c.objetivo || '', color: c.color, fecha_inicio: c.fecha_inicio || '', fecha_fin: c.fecha_fin || '', estado: c.estado, responsable_id: c.responsable_id || '', presupuesto: c.presupuesto != null ? String(c.presupuesto) : '' })
+    if (c === 'nueva') setForm({ nombre: '', descripcion: '', objetivo: '', color: '#f15922', fecha_inicio: '', fecha_fin: '', estado: 'activa', responsable_id: usuario?.id || '' })
+    else setForm({ nombre: c.nombre, descripcion: c.descripcion || '', objetivo: c.objetivo || '', color: c.color, fecha_inicio: c.fecha_inicio || '', fecha_fin: c.fecha_fin || '', estado: c.estado, responsable_id: c.responsable_id || '' })
   }
 
   async function guardar() {
@@ -77,7 +77,6 @@ export default function CampanasPage() {
       nombre: form.nombre.trim(), descripcion: form.descripcion || null, objetivo: form.objetivo || null, color: form.color,
       fecha_inicio: form.fecha_inicio || null, fecha_fin: form.fecha_fin || null, estado: form.estado, responsable_id: form.responsable_id || null,
     }
-    if (permisos?.ver_presupuestos) payload.presupuesto = form.presupuesto ? parseFloat(form.presupuesto) : null
     if (editando && editando !== 'nueva') await supabase.from('mkt_campanas').update(payload).eq('id', editando.id)
     else await supabase.from('mkt_campanas').insert({ ...payload, creado_por: usuario.id })
     setEditando(null); cargar()
@@ -181,7 +180,6 @@ export default function CampanasPage() {
                   {abierta.objetivo && <Campo label="Objetivo"><p style={{ fontSize: '0.875rem', color: 'var(--text)' }}>{abierta.objetivo}</p></Campo>}
                   {abierta.descripcion && <Campo label="Descripción"><p style={{ fontSize: '0.875rem', color: 'var(--text)' }}>{abierta.descripcion}</p></Campo>}
                   <Campo label="Responsable"><p style={{ fontSize: '0.875rem', color: 'var(--text)' }}>{usuarios.find(u => u.id === abierta.responsable_id)?.nombre || 'Sin asignar'}</p></Campo>
-                  {permisos.ver_presupuestos && <Campo label="Presupuesto"><p style={{ fontSize: '0.875rem', color: 'var(--text)' }}>{abierta.presupuesto != null ? pesos(abierta.presupuesto) : 'No cargado'}</p></Campo>}
                   <Campo label="Resultados finales">
                     <textarea value={resultados} onChange={e => setResultados(e.target.value)} onBlur={guardarResultados} rows={4} placeholder="Qué se logró: alcance, ventas, aprendizajes…" style={{ ...inp, resize: 'vertical' }} />
                   </Campo>
@@ -242,7 +240,6 @@ export default function CampanasPage() {
               <Campo label="Estado"><select value={form.estado} onChange={e => setForm(f => ({ ...f, estado: e.target.value }))} style={inp}>{ESTADOS.map(e => <option key={e.key} value={e.key}>{e.label}</option>)}</select></Campo>
               <Campo label="Responsable"><select value={form.responsable_id} onChange={e => setForm(f => ({ ...f, responsable_id: e.target.value }))} style={inp}><option value="">Sin asignar</option>{usuarios.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}</select></Campo>
             </div>
-            {permisos.ver_presupuestos && <Campo label="Presupuesto (ARS)"><input type="number" min="0" value={form.presupuesto} onChange={e => setForm(f => ({ ...f, presupuesto: e.target.value }))} style={inp} /></Campo>}
             <Campo label="Color">
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {COLORES.map(c => <button key={c} onClick={() => setForm(f => ({ ...f, color: c }))} aria-label={c} style={{ width: 28, height: 28, borderRadius: '50%', backgroundColor: c, border: 'none', outline: form.color === c ? '3px solid var(--text)' : 'none', cursor: 'pointer' }} />)}
