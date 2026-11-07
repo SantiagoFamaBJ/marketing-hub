@@ -78,11 +78,10 @@ const DEFAULT_PERMISOS: Record<string, Record<string, boolean>> = {
 }
 export type Permisos = Record<string, boolean>
 
-export async function cargarPermisos(rol: string): Promise<Permisos> {
-  const base = { ...(DEFAULT_PERMISOS[rol] || DEFAULT_PERMISOS.mkt_limitado) }
-  const { data } = await supabase.from('mkt_permisos').select('permiso, habilitado').eq('rol', rol)
-  ;(data || []).forEach((p: any) => { base[p.permiso] = p.habilitado })
-  return base
+// Todos ven y pueden lo mismo. Reportes, presupuestos y vistas de gestión viven solo en /ADMIN.
+const PERMISOS_IGUALES: Permisos = { ver_reportes: false, ver_dashboard_equipo: false, ver_presupuestos: false, ver_todas_tareas: true, asignar_a_otros: true, aprobar_tareas: true, gestionar_campanas: true }
+export async function cargarPermisos(_rol?: string): Promise<Permisos> {
+  return { ...PERMISOS_IGUALES }
 }
 
 export async function usuariosConPermiso(permiso: string): Promise<Usuario[]> {

@@ -95,7 +95,7 @@ export default function TareasPage() {
         <h1 style={{ fontSize: 'clamp(1.25rem, 4vw, 1.6rem)', fontWeight: 700, color: 'var(--text)' }}>✅ Tareas</h1>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', minWidth: 0, maxWidth: '100%' }}>
           <div style={{ display: 'flex', border: '1.5px solid var(--border)', borderRadius: 8, overflowX: 'auto', maxWidth: '100%', minWidth: 0 }}>
-            {([['kanban', '⬛ Kanban'], ['lista', '☰ Lista'], ['calendario', '📅 Mes'], ['semana', '🗓️ Semana'], ['persona', '👥 Equipo'], ['aprobaciones', `🔁 Aprobaciones${aprobarPend ? ` (${aprobarPend})` : ''}`]] as [Vista, string][]).filter(([v]) => v !== 'persona' || permisos.ver_dashboard_equipo).map(([v, l]) => (
+            {([['kanban', '⬛ Kanban'], ['lista', '☰ Lista'], ['calendario', '📅 Mes'], ['semana', '🗓️ Semana'], ['persona', '👥 Equipo'], ['aprobaciones', `🔁 Aprobaciones${aprobarPend ? ` (${aprobarPend})` : ''}`]] as [Vista, string][]).map(([v, l]) => (
               <button key={v} onClick={() => setVista(v)} style={{ padding: '0.4rem 0.7rem', border: 'none', whiteSpace: 'nowrap', backgroundColor: vista === v ? '#f15922' : 'var(--bg-card)', color: vista === v ? '#fff' : 'var(--text-muted)', cursor: 'pointer', fontSize: '0.78rem', fontWeight: vista === v ? 600 : 400 }}>{l}</button>
             ))}
           </div>

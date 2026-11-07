@@ -1,5 +1,6 @@
 'use client'
 
+import ReportesAdmin from '@/components/ReportesAdmin'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -30,7 +31,7 @@ function Campo({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-type Tab = 'usuarios' | 'permisos' | 'plantillas' | 'etiquetas' | 'manuales' | 'tareas'
+type Tab = 'usuarios' | 'reportes' | 'plantillas' | 'etiquetas' | 'manuales' | 'tareas'
 
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>('usuarios')
@@ -194,7 +195,7 @@ export default function AdminPage() {
 
   const TABS: { key: Tab; label: string; emoji: string }[] = [
     { key: 'usuarios', label: 'Usuarios', emoji: '👥' },
-    { key: 'permisos', label: 'Permisos', emoji: '🔐' },
+    { key: 'reportes', label: 'Reportes', emoji: '📊' },
     { key: 'plantillas', label: 'Copys', emoji: '✍️' },
     { key: 'etiquetas', label: 'Etiquetas', emoji: '🏷️' },
     { key: 'manuales', label: 'Manuales', emoji: '📚' },
@@ -255,34 +256,8 @@ export default function AdminPage() {
         )}
 
         {/* ===== PERMISOS ===== */}
-        {tab === 'permisos' && (
-          <div style={{ backgroundColor: '#fff', border: '1.5px solid #e8e8e8', borderRadius: '12px', padding: '1rem 1.25rem', overflowX: 'auto' }}>
-            <p style={{ fontSize: '0.8rem', color: '#888', marginBottom: '1rem' }}>Qué puede hacer cada rol. Los cambios se aplican al instante (la persona ve el cambio al recargar la página).</p>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', minWidth: 460 }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: 'left', padding: '8px 4px', color: '#555' }}>Permiso</th>
-                  {Object.entries(ROLES).map(([k, v]) => <th key={k} style={{ padding: '8px 4px', color: '#555', fontSize: '0.72rem' }}>{v.split(' (')[0]}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(PERMISOS).map(([perm, label]) => (
-                  <tr key={perm} style={{ borderTop: '1px solid #f0f0f0' }}>
-                    <td style={{ padding: '10px 4px', color: '#1a1a1a' }}>{label}</td>
-                    {Object.keys(ROLES).map(rol => (
-                      <td key={rol} style={{ textAlign: 'center' }}>
-                        <input type="checkbox" checked={!!permisosMatriz[rol]?.[perm]} onChange={e => togglePermiso(rol, perm, e.target.checked)} style={{ width: 18, height: 18, accentColor: '#f15922', cursor: 'pointer' }} />
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <p style={{ fontSize: '0.75rem', color: '#a0a0a0', marginTop: '1rem' }}>Las tareas compartidas siempre son visibles para sus colaboradores, aunque el rol no pueda ver todas las tareas.</p>
-          </div>
-        )}
+        {tab === 'reportes' && <ReportesAdmin />}
 
-        {/* ===== PLANTILLAS ===== */}
         {tab === 'plantillas' && (
           <>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>

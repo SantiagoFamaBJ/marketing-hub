@@ -40,7 +40,7 @@ export default function TareaDetalle({ tarea, usuario, usuarios, permisos, campa
   const mapaUsuarios = Object.fromEntries(usuarios.map(u => [u.id, u]))
   const soyParte = tarea.creado_por === usuario.id || tarea.asignados.some(a => a.id === usuario.id)
   const puedeEditar = soyParte || permisos.aprobar_tareas
-  const puedeAprobar = !!permisos.aprobar_tareas
+  const puedeAprobar = !!permisos.aprobar_tareas && tarea.responsable_id !== usuario.id
   const est = estadoInfo(tarea.estado)
   const pri = prioridadInfo(tarea.prioridad)
   const cerrada = estaCerrada(tarea.estado)

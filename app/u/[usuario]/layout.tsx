@@ -197,7 +197,6 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
             <div style={{ width: 34, height: 34, borderRadius: '50%', backgroundColor: usuario.avatar_color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>{usuario.avatar_emoji}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ fontSize: '0.8rem', fontWeight: 600, color: c.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{usuario.nombre}</p>
-              <p style={{ fontSize: '0.68rem', color: c.textMuted }}>{rolCorto(usuario.rol)}</p>
             </div>
             <button onClick={() => { sessionStorage.removeItem('mkt_usuario'); router.push('/') }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', padding: '4px', borderRadius: '6px', color: c.textMuted }}>↩</button>
           </div>
