@@ -314,3 +314,19 @@ export async function reprogramarTarea(tarea: Tarea, nuevaFecha: string, actor: 
   await supabase.from('mkt_tareas').update({ deadline: nuevaFecha, actualizado_en: new Date().toISOString() }).eq('id', tarea.id)
   await log(actor.id, tarea.id, tarea.titulo, 'tarea_reprogramada', `${fechaCorta(tarea.deadline)} → ${fechaCorta(nuevaFecha)}`)
 }
+
+/** Pasa todas las tareas abiertas de una persona a otra (responsable y colaborador). Nada se borra. */
+export async function transferirTareas(desde: Usuario, hacia: Usuario, actor: Usuario): Promise<number> {
+  const tareas = await cargarTareas({})
+  const abiertas = tareas.filter(t => !estaCerrada(t.estado) && (t.responsable_id === desde.id || t.asignados.some(a => a.id === desde.id)))
+  for (const t of abiertas) {
+    const eraResp = t.responsable_id === desde.id
+    const yaEsta = t.asignados.some(a => a.id === hacia.id)
+    if (!yaEsta) await supabase.from('mkt_tarea_asignados').insert({ tarea_id: t.id, usuario_id: hacia.id })
+    if (eraResp) await supabase.from('mkt_tareas').update({ responsable_id: hacia.id, actualizado_en: new Date().toISOString() }).eq('id', t.id)
+    await supabase.from('mkt_tarea_asignados').delete().eq('tarea_id', t.id).eq('usuario_id', desde.id)
+    await log(actor.id, t.id, t.titulo, 'tarea_reasignada', `${desde.nombre} → ${hacia.nombre} (traspaso)`)
+  }
+  if (abiertas.length > 0) await notificar([hacia.id], actor.id, 'tarea_reasignada', `Te pasaron ${abiertas.length} tarea${abiertas.length > 1 ? 's' : ''}`, `Traspaso desde ${desde.nombre}`, abiertas[0].id)
+  return abiertas.length
+}

@@ -40,7 +40,7 @@ export default function AdminPage() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [modalUsuario, setModalUsuario] = useState(false)
   const [editandoUsuario, setEditandoUsuario] = useState<Usuario | null>(null)
-  const [formUsuario, setFormUsuario] = useState({ nombre:'', slug:'', avatar_color:'#f15922', avatar_emoji:'😊', rol:'mkt' })
+  const [formUsuario, setFormUsuario] = useState({ nombre:'', slug:'', avatar_color:'#f15922', avatar_emoji:'😊', rol:'mkt', es_pasante: false })
 
   // Plantillas
   const [plantillas, setPlantillas] = useState<Plantilla[]>([])
@@ -109,14 +109,14 @@ export default function AdminPage() {
     setLoading(true)
     const slug = formUsuario.slug || slugify(formUsuario.nombre)
     if (editandoUsuario) {
-      await supabase.from('mkt_usuarios').update({ nombre: formUsuario.nombre, slug, avatar_color: formUsuario.avatar_color, avatar_emoji: formUsuario.avatar_emoji, rol: formUsuario.rol }).eq('id', editandoUsuario.id)
+      await supabase.from('mkt_usuarios').update({ nombre: formUsuario.nombre, slug, avatar_color: formUsuario.avatar_color, avatar_emoji: formUsuario.avatar_emoji, rol: formUsuario.rol, es_pasante: formUsuario.es_pasante }).eq('id', editandoUsuario.id)
     } else {
-      await supabase.from('mkt_usuarios').insert({ nombre: formUsuario.nombre, slug, avatar_color: formUsuario.avatar_color, avatar_emoji: formUsuario.avatar_emoji, rol: formUsuario.rol, activo: true })
+      await supabase.from('mkt_usuarios').insert({ nombre: formUsuario.nombre, slug, avatar_color: formUsuario.avatar_color, avatar_emoji: formUsuario.avatar_emoji, rol: formUsuario.rol, es_pasante: formUsuario.es_pasante, activo: true })
     }
     await fetchUsuarios(); setModalUsuario(false); setLoading(false)
   }
   async function toggleActivoUsuario(u: Usuario) {
-    await supabase.from('mkt_usuarios').update({ activo: !u.activo }).eq('id', u.id); fetchUsuarios()
+    await supabase.from('mkt_usuarios').update({ activo: !u.activo, fecha_baja: u.activo ? new Date().toISOString() : null }).eq('id', u.id); fetchUsuarios()
   }
 
   // PLANTILLAS
@@ -227,7 +227,7 @@ export default function AdminPage() {
         {tab === 'usuarios' && (
           <>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
-              <button onClick={() => { setEditandoUsuario(null); setFormUsuario({ nombre:'', slug:'', avatar_color:'#f15922', avatar_emoji:'😊', rol:'mkt' }); setModalUsuario(true) }} style={{ backgroundColor: '#f15922', color: '#fff', border: 'none', borderRadius: '10px', padding: '0.625rem 1.25rem', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer' }}>+ Nuevo usuario</button>
+              <button onClick={() => { setEditandoUsuario(null); setFormUsuario({ nombre:'', slug:'', avatar_color:'#f15922', avatar_emoji:'😊', rol:'mkt', es_pasante: false }); setModalUsuario(true) }} style={{ backgroundColor: '#f15922', color: '#fff', border: 'none', borderRadius: '10px', padding: '0.625rem 1.25rem', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer' }}>+ Nuevo usuario</button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {usuarios.length === 0 && <p style={{ textAlign: 'center', color: '#888', padding: '2rem' }}>No hay usuarios todavía.</p>}
@@ -245,7 +245,7 @@ export default function AdminPage() {
                     <p style={{ fontSize: '0.75rem', color: '#a0a0a0', marginTop: '2px' }}>/{u.slug}</p>
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <button onClick={() => { setEditandoUsuario(u); setFormUsuario({ nombre: u.nombre, slug: u.slug, avatar_color: u.avatar_color, avatar_emoji: u.avatar_emoji, rol: u.rol }); setModalUsuario(true) }} style={{ background: '#f4f4f4', border: 'none', borderRadius: '8px', padding: '0.375rem 0.75rem', cursor: 'pointer', fontSize: '0.8rem', color: '#444' }}>Editar</button>
+                    <button onClick={() => { setEditandoUsuario(u); setFormUsuario({ nombre: u.nombre, slug: u.slug, avatar_color: u.avatar_color, avatar_emoji: u.avatar_emoji, rol: u.rol, es_pasante: !!(u as any).es_pasante }); setModalUsuario(true) }} style={{ background: '#f4f4f4', border: 'none', borderRadius: '8px', padding: '0.375rem 0.75rem', cursor: 'pointer', fontSize: '0.8rem', color: '#444' }}>Editar</button>
                     <button onClick={() => toggleActivoUsuario(u)} style={{ background: u.activo ? '#fffbeb' : '#f0fdf4', border: 'none', borderRadius: '8px', padding: '0.375rem 0.75rem', cursor: 'pointer', fontSize: '0.8rem', color: u.activo ? '#f59e0b' : '#10b981' }}>{u.activo ? 'Desactivar' : 'Activar'}</button>
                   </div>
                 </div>
@@ -408,6 +408,11 @@ export default function AdminPage() {
               <select value={formUsuario.rol} onChange={e => setFormUsuario(f => ({ ...f, rol: e.target.value }))} style={inputStyle}>
                 {Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
+            </Campo>
+            <Campo label="Pasantía">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', cursor: 'pointer' }}>
+                <input type="checkbox" checked={formUsuario.es_pasante} onChange={e => setFormUsuario(f => ({ ...f, es_pasante: e.target.checked }))} style={{ accentColor: '#f15922' }} /> Es pasante (aparece en Reportes → Pasante)
+              </label>
             </Campo>
             <Campo label="Emoji">
               <div style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap' }}>

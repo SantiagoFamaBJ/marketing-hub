@@ -45,6 +45,10 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
     if (!stored) { router.push('/'); return }
     const u = JSON.parse(stored)
     setUsuario(u)
+    // Acceso desactivado → afuera (los datos se conservan)
+    supabase.from('mkt_usuarios').select('activo').eq('id', u.id).maybeSingle().then(({ data }) => {
+      if (data && data.activo === false) { sessionStorage.removeItem('mkt_usuario'); router.push('/') }
+    })
     fetchNotificaciones(u.id)
     fetchTareasVencidas(u.id)
     cargarPermisos(u.rol).then(setPermisos)

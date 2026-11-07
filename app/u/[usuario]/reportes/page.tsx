@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import ReportesAnalisis from '@/components/ReportesAnalisis'
+import PasanteSeguimiento from '@/components/PasanteSeguimiento'
 import { cargarPermisos, normEstado, rolCorto, hoyISO } from '@/lib/tareas'
 
 type Usuario = { id: string; nombre: string; slug: string; avatar_color: string; avatar_emoji: string; rol: string }
@@ -27,6 +29,7 @@ export default function ReportesPage() {
   const [etiquetaStats, setEtiquetaStats] = useState<EtiquetaStat[]>([])
   const [tareasVencidas, setTareasVencidas] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [modo, setModo] = useState<'resumen' | 'analisis' | 'pasante'>('resumen')
   const router = useRouter()
 
   useEffect(() => {
@@ -108,6 +111,14 @@ export default function ReportesPage() {
         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>{new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</p>
       </div>
 
+      <div style={{ display: 'flex', gap: 6, marginBottom: '1.25rem', overflowX: 'auto' }}>
+        {([['resumen', '📊 Resumen'], ['analisis', '🔎 Análisis'], ['pasante', '🌱 Pasante']] as const).map(([k, l]) => (
+          <button key={k} onClick={() => setModo(k)} style={{ whiteSpace: 'nowrap', padding: '0.45rem 0.9rem', borderRadius: 8, border: '1.5px solid var(--border)', cursor: 'pointer', fontSize: '0.82rem', fontWeight: modo === k ? 700 : 400, backgroundColor: modo === k ? '#f15922' : 'var(--bg-card)', color: modo === k ? '#fff' : 'var(--text)' }}>{l}</button>
+        ))}
+      </div>
+      {modo === 'analisis' && <ReportesAnalisis />}
+      {modo === 'pasante' && <PasanteSeguimiento usuario={usuario as any} permisos={null} />}
+      {modo === 'resumen' && (<>
       {/* Stats globales */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', marginBottom: '2rem' }}>
         {[
@@ -244,6 +255,7 @@ export default function ReportesPage() {
           ))}
         </div>
       )}
+      </>)}
     </div>
   )
 }
