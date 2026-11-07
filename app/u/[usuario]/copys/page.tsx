@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import CopysGuardados from '@/components/CopysGuardados'
+import { cargarPermisos } from '@/lib/tareas'
 
 type Usuario = { id: string; nombre: string; slug: string; avatar_color: string; avatar_emoji: string; rol: string }
 type Variable = { key: string; label: string }
 type Plantilla = { id: string; nombre: string; categoria: string; contenido: string; variables: Variable[]; activa: boolean }
-type CopyGenerado = { id: string; nombre: string; contenido_final: string; creado_en: string; plantilla_id: string | null }
+type CopyGenerado = { id: string; nombre: string; contenido_final: string; creado_en: string; plantilla_id: string | null; estado?: string | null }
 
 const CATEGORIAS = ['Cursos', 'Congresos', 'Productos', 'Institucional', 'General']
 const inputStyle: React.CSSProperties = {
@@ -32,6 +34,9 @@ export default function CopysPage() {
   const [valores, setValores] = useState<Record<string, string>>({})
   const [nombreCopy, setNombreCopy] = useState('')
   const [copiado, setCopiado] = useState(false)
+  const [permisos, setPermisos] = useState<any>(null)
+  const [campanas, setCampanas] = useState<{ id: string; nombre: string }[]>([])
+  const [usuariosL, setUsuariosL] = useState<{ id: string; nombre: string }[]>([])
 
   // Modal admin - gestión de plantillas
   const [modalPlantilla, setModalPlantilla] = useState(false)
@@ -42,7 +47,7 @@ export default function CopysPage() {
 
   useEffect(() => {
     const stored = sessionStorage.getItem('mkt_usuario')
-    if (stored) { setUsuario(JSON.parse(stored)); fetchPlantillas(); fetchHistorial() }
+    if (stored) { const u = JSON.parse(stored); setUsuario(u); fetchPlantillas(); fetchHistorial(); cargarPermisos(u.rol).then(setPermisos); supabase.from('mkt_campanas').select('id,nombre').neq('estado', 'archivada').then(r => setCampanas(r.data || [])); supabase.from('mkt_usuarios').select('id,nombre').then(r => setUsuariosL(r.data || [])) }
   }, [])
 
   async function fetchPlantillas() {
@@ -82,6 +87,7 @@ export default function CopysPage() {
       contenido_final: contenido,
       variables_usadas: valores,
       creado_por: usuario.id,
+      estado: 'borrador',
     })
     fetchHistorial()
     alert('✅ Copy guardado en el historial')
@@ -274,38 +280,8 @@ export default function CopysPage() {
       )}
 
       {/* VISTA HISTORIAL */}
-      {vista === 'historial' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          {historial.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '4rem', color: '#888' }}>
-              <p style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>🕐</p>
-              <p style={{ fontWeight: 600 }}>No hay copys guardados todavía</p>
-            </div>
-          )}
-          {historial.map(c => (
-            <div key={c.id} style={{ backgroundColor: '#fff', border: '1.5px solid #e8e8e8', borderRadius: '12px', padding: '1.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                <p style={{ fontWeight: 600, color: '#1a1a1a', fontSize: '0.9rem' }}>{c.nombre}</p>
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#888' }}>
-                    {new Date(c.creado_en).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </span>
-                  <button onClick={() => navigator.clipboard.writeText(c.contenido_final)} style={{
-                    padding: '0.25rem 0.625rem', border: '1.5px solid #e8e8e8',
-                    borderRadius: '6px', backgroundColor: '#fff', cursor: 'pointer', fontSize: '0.75rem', color: '#555',
-                  }}>Copiar</button>
-                </div>
-              </div>
-              <div style={{
-                backgroundColor: '#f9fafb', borderRadius: '8px', padding: '0.875rem',
-                fontSize: '0.8rem', color: '#444', lineHeight: 1.6, whiteSpace: 'pre-wrap',
-                maxHeight: 120, overflowY: 'auto',
-              }}>
-                {c.contenido_final}
-              </div>
-            </div>
-          ))}
-        </div>
+      {vista === 'historial' && usuario && (
+        <CopysGuardados usuario={usuario} permisos={permisos} copys={historial as any} campanas={campanas} usuarios={usuariosL} onChanged={fetchHistorial} />
       )}
 
       {/* Modal gestión de plantillas (admin) */}

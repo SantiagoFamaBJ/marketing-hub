@@ -11,6 +11,7 @@ import {
 type Comentario = { id: string; autor_id: string; contenido: string; creado_en: string }
 type Adjunto = { id: string; nombre_archivo: string; url: string; tipo: string | null; creado_en: string; version: number }
 type Subtarea = { id: string; texto: string; completado: boolean }
+type Manual = { id: string; titulo: string; url: string | null; tipo: string }
 type Revision = { id: string; version: number; accion: string; comentario: string | null; usuario_id: string | null; creado_en: string }
 
 const inp: React.CSSProperties = { width: '100%', padding: '0.625rem 0.875rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', color: 'var(--text)', backgroundColor: 'var(--input-bg)' }
@@ -25,6 +26,8 @@ export default function TareaDetalle({ tarea, usuario, usuarios, permisos, campa
   const [adjuntos, setAdjuntos] = useState<Adjunto[]>([])
   const [subtareas, setSubtareas] = useState<Subtarea[]>([])
   const [revisiones, setRevisiones] = useState<Revision[]>([])
+  const [manuales, setManuales] = useState<Manual[]>([])
+  const [vinculados, setVinculados] = useState<string[]>([])
   const [nuevoComentario, setNuevoComentario] = useState('')
   const [nuevaSub, setNuevaSub] = useState('')
   const [link, setLink] = useState({ nombre: '', url: '' })
@@ -46,13 +49,26 @@ export default function TareaDetalle({ tarea, usuario, usuarios, permisos, campa
   useEffect(() => { cargar() }, [tarea.id])
 
   async function cargar() {
-    const [c, a, s, r] = await Promise.all([
+    const [c, a, s, r, mn, vn] = await Promise.all([
       supabase.from('mkt_tarea_comentarios').select('*').eq('tarea_id', tarea.id).order('creado_en', { ascending: true }),
       supabase.from('mkt_tarea_adjuntos').select('*').eq('tarea_id', tarea.id).order('creado_en', { ascending: false }),
       supabase.from('mkt_subtareas').select('*').eq('tarea_id', tarea.id).order('orden').order('creado_en'),
       supabase.from('mkt_tarea_revisiones').select('*').eq('tarea_id', tarea.id).order('creado_en', { ascending: false }),
+      supabase.from('mkt_manuales').select('id, titulo, url, tipo').eq('activo', true).order('titulo'),
+      supabase.from('mkt_tarea_manuales').select('manual_id').eq('tarea_id', tarea.id),
     ])
     setComentarios(c.data || []); setAdjuntos(a.data || []); setSubtareas(s.data || []); setRevisiones(r.data || [])
+    setManuales(mn.data || []); setVinculados((vn.data || []).map((x: any) => x.manual_id))
+  }
+
+  async function vincularManual(id: string) {
+    if (!id) return
+    await supabase.from('mkt_tarea_manuales').insert({ tarea_id: tarea.id, manual_id: id })
+    setVinculados(v => [...v, id])
+  }
+  async function desvincularManual(id: string) {
+    await supabase.from('mkt_tarea_manuales').delete().eq('tarea_id', tarea.id).eq('manual_id', id)
+    setVinculados(v => v.filter(x => x !== id))
   }
 
   async function comentar() {
@@ -151,6 +167,7 @@ export default function TareaDetalle({ tarea, usuario, usuarios, permisos, campa
                 <span style={{ fontSize: '0.7rem', fontWeight: 700, backgroundColor: pri.bg, color: pri.color, padding: '2px 10px', borderRadius: 99 }}>{pri.label}</span>
                 <span style={{ fontSize: '0.7rem', fontWeight: 700, backgroundColor: est.bg, color: est.color, padding: '2px 10px', borderRadius: 99 }}>{est.label}</span>
                 {tarea.categoria && <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: 99 }}>{tarea.categoria}</span>}
+                {tarea.recurrencia && <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#0ea5e9', border: '1px solid #0ea5e955', padding: '2px 8px', borderRadius: 99 }}>🔁 {tarea.recurrencia}</span>}
                 {tarea.requiere_aprobacion && <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#8b5cf6', border: '1px solid #8b5cf655', padding: '2px 8px', borderRadius: 99 }}>🔒 Con aprobación</span>}
                 {tarea.etiquetas.map(e => <span key={e.id} style={{ fontSize: '0.65rem', fontWeight: 600, backgroundColor: e.color + '22', color: e.color, padding: '2px 8px', borderRadius: 4 }}>{e.nombre}</span>)}
               </div>
@@ -187,6 +204,31 @@ export default function TareaDetalle({ tarea, usuario, usuarios, permisos, campa
               {tarea.descripcion && tarea.descripcion !== '<p></p>'
                 ? <div style={{ backgroundColor: 'var(--bg)', borderRadius: 10, padding: '1rem', marginBottom: 14 }}><RichContent html={tarea.descripcion} /></div>
                 : <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic', marginBottom: 14 }}>Sin descripción.</p>}
+
+              {(vinculados.length > 0 || (puedeEditar && manuales.length > 0)) && (
+                <div style={{ marginBottom: 14 }}>
+                  <Dato label="📚 Manuales de apoyo">
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                      {vinculados.map(id => {
+                        const m = manuales.find(x => x.id === id)
+                        if (!m) return null
+                        return (
+                          <span key={id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, border: '1px solid var(--border)', borderRadius: 99, padding: '3px 10px', fontSize: '0.78rem' }}>
+                            {m.url ? <a href={m.url} target="_blank" rel="noopener noreferrer" style={{ color: '#f15922', textDecoration: 'none', fontWeight: 600 }}>{m.titulo} ↗</a> : m.titulo}
+                            {puedeEditar && <button onClick={() => desvincularManual(id)} aria-label="Quitar" style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>×</button>}
+                          </span>
+                        )
+                      })}
+                      {puedeEditar && manuales.filter(m => !vinculados.includes(m.id)).length > 0 && (
+                        <select value="" onChange={e => vincularManual(e.target.value)} style={{ ...inp, width: 'auto', padding: '0.3rem 0.5rem', fontSize: '0.78rem' }}>
+                          <option value="">+ Vincular manual</option>
+                          {manuales.filter(m => !vinculados.includes(m.id)).map(m => <option key={m.id} value={m.id}>{m.titulo}</option>)}
+                        </select>
+                      )}
+                    </div>
+                  </Dato>
+                </div>
+              )}
 
               {/* Estado */}
               {puedeEditar && !cerrada && (

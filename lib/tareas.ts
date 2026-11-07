@@ -9,6 +9,7 @@ export type Tarea = {
   creado_por: string | null; responsable_id: string | null
   categoria: string | null; campana_id: string | null
   requiere_aprobacion: boolean
+  recurrencia: string | null; recurrencia_origen_id: string | null; siguiente_generada: boolean
   horas_dedicadas: number | null
   creado_en: string; actualizado_en: string | null
   enviada_revision_en: string | null; aprobada_en: string | null; finalizada_en: string | null
@@ -126,6 +127,8 @@ export async function cargarTareas(opts: { usuarioId?: string; soloMias?: boolea
       ...t,
       estado: normEstado(t.estado),
       requiere_aprobacion: !!t.requiere_aprobacion,
+      recurrencia: t.recurrencia || null,
+      siguiente_generada: !!t.siguiente_generada,
       asignados: [...ids].map(id => usuarios[id]).filter(Boolean),
       responsable: t.responsable_id ? usuarios[t.responsable_id] || null : null,
       etiquetas: (etiPorTarea[t.id] || []).map(id => etiquetas[id]).filter(Boolean),
@@ -159,12 +162,12 @@ export const NOTIF_TIPOS: Record<string, string> = {
 }
 
 /** Crea una notificación respetando las preferencias de cada persona. No se notifica a uno mismo. */
-export async function notificar(destinos: string[], actorId: string | null, tipo: string, titulo: string, mensaje: string | null, tareaId: string) {
+export async function notificar(destinos: string[], actorId: string | null, tipo: string, titulo: string, mensaje: string | null, tareaId: string, refTipo: string = 'tarea') {
   const ids = [...new Set(destinos)].filter(id => id && id !== actorId)
   if (ids.length === 0) return
   const { data: prefs } = await supabase.from('mkt_notif_prefs').select('usuario_id').eq('tipo', tipo).eq('activa', false).in('usuario_id', ids)
   const apagadas = new Set((prefs || []).map((p: any) => p.usuario_id))
-  const filas = ids.filter(id => !apagadas.has(id)).map(id => ({ usuario_id: id, tipo, titulo, mensaje, referencia_id: tareaId, referencia_tipo: 'tarea' }))
+  const filas = ids.filter(id => !apagadas.has(id)).map(id => ({ usuario_id: id, tipo, titulo, mensaje, referencia_id: tareaId, referencia_tipo: refTipo }))
   if (filas.length > 0) await supabase.from('mkt_notificaciones').insert(filas)
 }
 
@@ -214,6 +217,7 @@ export async function aplicarAccion(opts: {
     await supabase.from('mkt_tareas').update(base).eq('id', tarea.id)
     await log(actor.id, tarea.id, tarea.titulo, 'tarea_movida', `${desde} → Finalizada`)
     await notificar([tarea.creado_por || ''], actor.id, 'tarea_aprobada', 'Tarea finalizada', tarea.titulo, tarea.id)
+    await generarSiguienteRecurrente(tarea, actor)
     return
   }
 
@@ -236,6 +240,7 @@ export async function aplicarAccion(opts: {
     await supabase.from('mkt_tarea_revisiones').insert({ tarea_id: tarea.id, version: ult?.[0]?.version || 1, accion: 'aprobada', comentario: comentario || null, usuario_id: actor.id })
     await log(actor.id, tarea.id, tarea.titulo, 'tarea_aprobada', comentario || undefined)
     await notificar(tarea.asignados.map(a => a.id), actor.id, 'tarea_aprobada', 'Tarea aprobada ✅', tarea.titulo, tarea.id)
+    await generarSiguienteRecurrente(tarea, actor)
     return
   }
 
@@ -254,4 +259,58 @@ export async function aplicarAccion(opts: {
 export async function versionActual(tareaId: string) {
   const { count } = await supabase.from('mkt_tarea_revisiones').select('id', { count: 'exact', head: true }).eq('tarea_id', tareaId).eq('accion', 'enviada')
   return (count || 0) + 1
+}
+
+// ───────── Recurrencia, reasignación y reprogramación ─────────
+function proximaFecha(deadline: string, recurrencia: string) {
+  const hoy = hoyISO()
+  let d = new Date(deadline + 'T12:00:00')
+  const dia = d.getDate()
+  let guard = 0
+  do {
+    if (recurrencia === 'semanal') d.setDate(d.getDate() + 7)
+    else {
+      const m = d.getMonth() + 1
+      d = new Date(d.getFullYear(), m, 1, 12)
+      const ultimo = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+      d.setDate(Math.min(dia, ultimo))
+    }
+  } while (isoLocal(d) < hoy && ++guard < 60)
+  return isoLocal(d)
+}
+
+/** Al cerrar una tarea recurrente, crea la siguiente (una sola vez). */
+export async function generarSiguienteRecurrente(tarea: Tarea, actor: Usuario) {
+  if (!tarea.recurrencia || tarea.siguiente_generada) return
+  const { data: marca } = await supabase.from('mkt_tareas').update({ siguiente_generada: true }).eq('id', tarea.id).eq('siguiente_generada', false).select('id')
+  if (!marca || marca.length === 0) return // otra persona ya la generó
+  const { data: nueva } = await supabase.from('mkt_tareas').insert({
+    titulo: tarea.titulo, descripcion: tarea.descripcion, prioridad: tarea.prioridad, categoria: tarea.categoria,
+    campana_id: tarea.campana_id, creado_por: tarea.creado_por, responsable_id: tarea.responsable_id,
+    requiere_aprobacion: tarea.requiere_aprobacion, recurrencia: tarea.recurrencia,
+    recurrencia_origen_id: tarea.recurrencia_origen_id || tarea.id, estado: 'pendiente',
+    deadline: proximaFecha(tarea.deadline, tarea.recurrencia),
+  }).select().single()
+  if (!nueva) return
+  const ids = tarea.asignados.map(a => a.id)
+  if (ids.length) await supabase.from('mkt_tarea_asignados').insert(ids.map(u => ({ tarea_id: nueva.id, usuario_id: u })))
+  if (tarea.etiquetas.length) await supabase.from('mkt_tarea_etiquetas').insert(tarea.etiquetas.map(e => ({ tarea_id: nueva.id, etiqueta_id: e.id })))
+  const { data: subs } = await supabase.from('mkt_subtareas').select('texto, orden').eq('tarea_id', tarea.id)
+  if (subs && subs.length) await supabase.from('mkt_subtareas').insert(subs.map((x: any) => ({ tarea_id: nueva.id, texto: x.texto, orden: x.orden })))
+  await log(actor.id, nueva.id, nueva.titulo, 'tarea_creada', `Recurrente (${tarea.recurrencia})`)
+  await notificar(ids, actor.id, 'tarea_asignada', 'Nueva tarea recurrente', `${tarea.titulo} · vence ${fechaCorta(nueva.deadline)}`, nueva.id)
+}
+
+export async function reasignarTarea(tarea: Tarea, nuevoId: string, actor: Usuario, nombreNuevo: string) {
+  if (tarea.responsable_id === nuevoId) return
+  await supabase.from('mkt_tareas').update({ responsable_id: nuevoId, actualizado_en: new Date().toISOString() }).eq('id', tarea.id)
+  if (!tarea.asignados.some(a => a.id === nuevoId)) await supabase.from('mkt_tarea_asignados').insert({ tarea_id: tarea.id, usuario_id: nuevoId })
+  await log(actor.id, tarea.id, tarea.titulo, 'tarea_reasignada', `${tarea.responsable?.nombre || 'Sin responsable'} → ${nombreNuevo}`)
+  await notificar([nuevoId], actor.id, 'tarea_reasignada', 'Te pasaron una tarea', tarea.titulo, tarea.id)
+}
+
+export async function reprogramarTarea(tarea: Tarea, nuevaFecha: string, actor: Usuario) {
+  if (tarea.deadline === nuevaFecha) return
+  await supabase.from('mkt_tareas').update({ deadline: nuevaFecha, actualizado_en: new Date().toISOString() }).eq('id', tarea.id)
+  await log(actor.id, tarea.id, tarea.titulo, 'tarea_reprogramada', `${fechaCorta(tarea.deadline)} → ${fechaCorta(nuevaFecha)}`)
 }

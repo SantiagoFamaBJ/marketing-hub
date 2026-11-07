@@ -9,9 +9,10 @@ import {
 } from '@/lib/tareas'
 import TareaDetalle from '@/components/TareaDetalle'
 import TareaForm from '@/components/TareaForm'
+import { VistaPersona, VistaAprobaciones, VistaSemana } from '@/components/VistasEquipo'
 
 type Campana = { id: string; nombre: string; color: string }
-type Vista = 'kanban' | 'lista' | 'calendario'
+type Vista = 'kanban' | 'lista' | 'calendario' | 'semana' | 'persona' | 'aprobaciones'
 
 const sel: React.CSSProperties = { padding: '0.4rem 0.6rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.8rem', color: 'var(--text)', backgroundColor: 'var(--input-bg)', outline: 'none', maxWidth: '100%' }
 
@@ -92,10 +93,10 @@ export default function TareasPage() {
       {/* Encabezado */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.875rem', flexWrap: 'wrap', gap: '0.75rem' }}>
         <h1 style={{ fontSize: 'clamp(1.25rem, 4vw, 1.6rem)', fontWeight: 700, color: 'var(--text)' }}>✅ Tareas</h1>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', border: '1.5px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-            {([['kanban', '⬛ Kanban'], ['lista', '☰ Lista'], ['calendario', '📅 Calendario']] as [Vista, string][]).map(([v, l]) => (
-              <button key={v} onClick={() => setVista(v)} style={{ padding: '0.4rem 0.7rem', border: 'none', backgroundColor: vista === v ? '#f15922' : 'var(--bg-card)', color: vista === v ? '#fff' : 'var(--text-muted)', cursor: 'pointer', fontSize: '0.78rem', fontWeight: vista === v ? 600 : 400 }}>{l}</button>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', minWidth: 0, maxWidth: '100%' }}>
+          <div style={{ display: 'flex', border: '1.5px solid var(--border)', borderRadius: 8, overflowX: 'auto', maxWidth: '100%', minWidth: 0 }}>
+            {([['kanban', '⬛ Kanban'], ['lista', '☰ Lista'], ['calendario', '📅 Mes'], ['semana', '🗓️ Semana'], ['persona', '👥 Equipo'], ['aprobaciones', `🔁 Aprobaciones${aprobarPend ? ` (${aprobarPend})` : ''}`]] as [Vista, string][]).filter(([v]) => v !== 'persona' || permisos.ver_dashboard_equipo).map(([v, l]) => (
+              <button key={v} onClick={() => setVista(v)} style={{ padding: '0.4rem 0.7rem', border: 'none', whiteSpace: 'nowrap', backgroundColor: vista === v ? '#f15922' : 'var(--bg-card)', color: vista === v ? '#fff' : 'var(--text-muted)', cursor: 'pointer', fontSize: '0.78rem', fontWeight: vista === v ? 600 : 400 }}>{l}</button>
             ))}
           </div>
           <button onClick={() => setForm({ tarea: null })} style={{ backgroundColor: '#f15922', color: '#fff', border: 'none', borderRadius: 8, padding: '0.45rem 1rem', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>+ Nueva</button>
@@ -197,6 +198,10 @@ export default function TareasPage() {
 
       {/* CALENDARIO */}
       {!cargando && vista === 'calendario' && <CalendarioTareas tareas={filtradas} mes={mes} setMes={setMes} diaSel={diaSel} setDiaSel={setDiaSel} onOpen={id => setDetalleId(id)} />}
+
+      {!cargando && vista === 'semana' && <VistaSemana tareas={filtradas} usuarios={usuarios} usuario={usuario} permisos={permisos} onOpen={setDetalleId} onChanged={refrescar} />}
+      {!cargando && vista === 'persona' && <VistaPersona tareas={filtradas} usuarios={usuarios} usuario={usuario} permisos={permisos} onOpen={setDetalleId} onChanged={refrescar} />}
+      {!cargando && vista === 'aprobaciones' && <VistaAprobaciones tareas={tareas} usuarios={usuarios} usuario={usuario} permisos={permisos} onOpen={setDetalleId} onChanged={refrescar} />}
 
       {detalle && (
         <TareaDetalle tarea={detalle} usuario={usuario} usuarios={usuarios} permisos={permisos} campanaNombre={campanaNombre(detalle.campana_id)}

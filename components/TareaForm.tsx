@@ -15,8 +15,8 @@ function Campo({ label, children }: { label: string; children: React.ReactNode }
   return <div style={{ marginBottom: '0.875rem' }}><label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>{label}</label>{children}</div>
 }
 
-export default function TareaForm({ tarea, usuario, usuarios, etiquetas, campanas, permisos, onClose, onSaved, onNuevaEtiqueta }: {
-  tarea: Tarea | null; usuario: Usuario; usuarios: Usuario[]; etiquetas: Etiqueta[]; campanas: Campana[]; permisos: Permisos
+export default function TareaForm({ tarea, usuario, usuarios, etiquetas, campanas, permisos, campanaInicial, onClose, onSaved, onNuevaEtiqueta }: {
+  tarea: Tarea | null; campanaInicial?: string; usuario: Usuario; usuarios: Usuario[]; etiquetas: Etiqueta[]; campanas: Campana[]; permisos: Permisos
   onClose: () => void; onSaved: () => void; onNuevaEtiqueta: () => void
 }) {
   const puedeAsignar = !!permisos.asignar_a_otros
@@ -26,11 +26,12 @@ export default function TareaForm({ tarea, usuario, usuarios, etiquetas, campana
     prioridad: tarea?.prioridad || 'media',
     deadline: tarea?.deadline || '',
     categoria: tarea?.categoria || '',
-    campana_id: tarea?.campana_id || '',
+    campana_id: tarea?.campana_id || campanaInicial || '',
     responsable_id: tarea?.responsable_id || usuario.id,
     colaboradores: (tarea?.asignados || []).filter(a => a.id !== tarea?.responsable_id).map(a => a.id),
     etiquetas: (tarea?.etiquetas || []).map(e => e.id),
     requiere_aprobacion: tarea?.requiere_aprobacion || false,
+    recurrencia: tarea?.recurrencia || '',
   })
   const [subs, setSubs] = useState<string[]>([])
   const [guardando, setGuardando] = useState(false)
@@ -49,7 +50,7 @@ export default function TareaForm({ tarea, usuario, usuarios, etiquetas, campana
     const payload = {
       titulo: f.titulo.trim(), descripcion: f.descripcion && f.descripcion !== '<p></p>' ? f.descripcion : null,
       prioridad: f.prioridad, deadline: f.deadline, categoria: f.categoria || null,
-      campana_id: f.campana_id || null, responsable_id: resp, requiere_aprobacion: f.requiere_aprobacion,
+      campana_id: f.campana_id || null, responsable_id: resp, requiere_aprobacion: f.requiere_aprobacion, recurrencia: f.recurrencia || null,
       actualizado_en: new Date().toISOString(),
     }
     let id = tarea?.id
@@ -102,6 +103,13 @@ export default function TareaForm({ tarea, usuario, usuarios, etiquetas, campana
             <select value={f.categoria} onChange={e => set('categoria', e.target.value)} style={inp}>
               <option value="">Sin categoría</option>
               {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </Campo>
+          <Campo label="Repetir">
+            <select value={f.recurrencia} onChange={e => set('recurrencia', e.target.value)} style={inp}>
+              <option value="">No se repite</option>
+              <option value="semanal">🔁 Cada semana</option>
+              <option value="mensual">🔁 Cada mes</option>
             </select>
           </Campo>
           {campanas.length > 0 && (

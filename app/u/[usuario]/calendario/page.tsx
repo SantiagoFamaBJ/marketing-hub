@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useSesion } from '@/lib/useSesion'
+import { Tarea, Usuario as UsuarioT, cargarTareas, cargarUsuarios, estaCerrada, CATEGORIAS } from '@/lib/tareas'
+import TareaDetalle from '@/components/TareaDetalle'
 
-type Usuario = { id: string; nombre: string; slug: string; avatar_color: string; avatar_emoji: string; rol: string }
 type Evento = { id: string; titulo: string; descripcion: string | null; tipo: string; fecha_inicio: string; fecha_fin: string | null; color: string }
 type CheckItem = { id: string; evento_id: string; texto: string; completado: boolean; orden: number }
-type TareaCalendario = { id: string; titulo: string; deadline: string; estado: string; prioridad: string; asignados: any[] }
+type CopyCal = { id: string; nombre: string; fecha_publicacion: string; estado: string | null }
+type CampCal = { id: string; nombre: string; color: string; fecha_inicio: string | null; fecha_fin: string | null }
 type Campana = { id: string; nombre: string }
 
 const TIPOS = [
@@ -15,62 +18,67 @@ const TIPOS = [
   { key: 'lanzamiento', label: 'Lanzamiento', emoji: '🚀' },
   { key: 'deadline', label: 'Deadline', emoji: '⏰' },
   { key: 'curso', label: 'Curso', emoji: '🎓' },
+  { key: 'capacitacion', label: 'Capacitación', emoji: '🧑‍🏫' },
+  { key: 'publicacion', label: 'Publicación', emoji: '📣' },
+  { key: 'reunion', label: 'Reunión', emoji: '👥' },
 ]
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const DIAS_CORTO = ['D','L','M','X','J','V','S']
 const COLORES = ['#f15922','#3B82F6','#8B5CF6','#10B981','#F59E0B','#EC4899','#06B6D4']
 const PRIORIDAD_COLOR: Record<string,string> = { urgente:'#dc2626', alta:'#ef4444', media:'#f59e0b', baja:'#10b981' }
 
-const inputStyle: React.CSSProperties = { width:'100%', padding:'0.625rem 0.875rem', border:'1.5px solid #e8e8e8', borderRadius:'8px', fontSize:'0.875rem', outline:'none', color:'#1a1a1a', backgroundColor:'#fff' }
+const inputStyle: React.CSSProperties = { width:'100%', padding:'0.625rem 0.875rem', border:'1.5px solid var(--border)', borderRadius:'8px', fontSize:'0.875rem', outline:'none', color:'var(--text)', backgroundColor:'var(--input-bg)' }
 
 function Campo({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: '1rem' }}>
-      <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#555', display: 'block', marginBottom: '0.375rem' }}>{label}</label>
+      <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text)', display: 'block', marginBottom: '0.375rem' }}>{label}</label>
       {children}
     </div>
   )
 }
 
 export default function CalendarioPage() {
-  const [usuario, setUsuario] = useState<Usuario | null>(null)
+  const { usuario, permisos } = useSesion()
   const [eventos, setEventos] = useState<Evento[]>([])
-  const [tareas, setTareas] = useState<TareaCalendario[]>([])
+  const [tareas, setTareas] = useState<Tarea[]>([])
+  const [usuarios, setUsuarios] = useState<UsuarioT[]>([])
+  const [copys, setCopys] = useState<CopyCal[]>([])
+  const [camps, setCamps] = useState<CampCal[]>([])
   const [campanas, setCampanas] = useState<Campana[]>([])
+  const [fCat, setFCat] = useState(''); const [fResp, setFResp] = useState('')
+  const [ver, setVer] = useState({ tareas: true, eventos: true, copys: true, campanas: true })
+  const [detalleId, setDetalleId] = useState<string | null>(null)
   const hoy = new Date()
   const [mes, setMes] = useState(hoy.getMonth())
   const [anio, setAnio] = useState(hoy.getFullYear())
-  const [seleccionado, setSeleccionado] = useState<{ tipo: 'evento' | 'tarea'; data: any } | null>(null)
+  const [seleccionado, setSeleccionado] = useState<{ tipo: 'evento'; data: any } | null>(null)
   const [checklist, setChecklist] = useState<CheckItem[]>([])
   const [nuevoCheck, setNuevoCheck] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState({ titulo: '', descripcion: '', tipo: 'evento', fecha_inicio: '', fecha_fin: '', color: '#f15922', campana_id: '' })
 
-  useEffect(() => {
-    const stored = sessionStorage.getItem('mkt_usuario')
-    if (stored) { setUsuario(JSON.parse(stored)); fetchEventos(); fetchTareas(); fetchCampanas() }
-  }, [])
+  useEffect(() => { if (usuario && permisos) recargar() }, [usuario?.id, permisos])
+
+  async function recargar() {
+    if (!usuario || !permisos) return
+    fetchEventos(); fetchCampanas()
+    const [t, u, c] = await Promise.all([
+      cargarTareas({ usuarioId: usuario.id, soloMias: !permisos.ver_todas_tareas }), cargarUsuarios(),
+      supabase.from('mkt_copys_generados').select('id,nombre,fecha_publicacion,estado').not('fecha_publicacion', 'is', null),
+    ])
+    setTareas(t); setUsuarios(u); setCopys((c.data || []) as CopyCal[])
+  }
 
   async function fetchEventos() {
     const { data } = await supabase.from('mkt_eventos').select('*').order('fecha_inicio')
     setEventos(data || [])
   }
 
-  async function fetchTareas() {
-    const { data: td } = await supabase.from('mkt_tareas').select('*').not('estado', 'in', '(finalizada,hecho)')
-    if (!td) return
-    const completas = await Promise.all(td.map(async t => {
-      const { data: ad } = await supabase.from('mkt_tarea_asignados').select('usuario_id').eq('tarea_id', t.id)
-      const aIds = (ad || []).map((a: any) => a.usuario_id)
-      const { data: au } = await supabase.from('mkt_usuarios').select('*').in('id', aIds.length > 0 ? aIds : ['00000000-0000-0000-0000-000000000000'])
-      return { ...t, asignados: au || [] }
-    }))
-    setTareas(completas)
-  }
-
   async function fetchCampanas() {
-    const { data } = await supabase.from('mkt_campanas').select('id, nombre')
+    const { data } = await supabase.from('mkt_campanas').select('id, nombre, color, fecha_inicio, fecha_fin, estado')
     setCampanas(data || [])
+    setCamps((data || []).filter((c: any) => c.fecha_inicio && c.fecha_fin && c.estado !== 'archivada'))
   }
 
   async function fetchChecklist(eventoId: string) {
@@ -123,26 +131,45 @@ export default function CalendarioPage() {
   while (celdas.length % 7 !== 0) celdas.push(null)
 
   const diaStr = (dia: number) => `${anio}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
-  const eventosDia = (dia: number) => eventos.filter(e => e.fecha_inicio <= diaStr(dia) && (e.fecha_fin ? e.fecha_fin >= diaStr(dia) : e.fecha_inicio === diaStr(dia)))
-  const tareasDia = (dia: number) => tareas.filter(t => t.deadline === diaStr(dia))
+  const eventosDia = (dia: number) => !ver.eventos ? [] : eventos.filter(e => e.fecha_inicio <= diaStr(dia) && (e.fecha_fin ? e.fecha_fin >= diaStr(dia) : e.fecha_inicio === diaStr(dia)))
+  const tareasFiltradas = tareas.filter(t => !estaCerrada(t.estado) && (!fCat || t.categoria === fCat) && (!fResp || t.responsable_id === fResp || t.asignados.some(a => a.id === fResp)))
+  const tareasDia = (dia: number) => ver.tareas ? tareasFiltradas.filter(t => t.deadline === diaStr(dia)) : []
+  const copysDia = (dia: number) => ver.copys ? copys.filter(c => c.fecha_publicacion === diaStr(dia)) : []
+  const campsDia = (dia: number) => ver.campanas ? camps.filter(c => c.fecha_inicio! <= diaStr(dia) && c.fecha_fin! >= diaStr(dia)) : []
   const esHoy = (dia: number) => dia === hoy.getDate() && mes === hoy.getMonth() && anio === hoy.getFullYear()
 
-  if (!usuario) return null
+  if (!usuario || !permisos) return null
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-        <h1 style={{ fontSize: 'clamp(1.25rem, 4vw, 1.6rem)', fontWeight: 700, color: '#1a1a1a' }}>📅 Calendario</h1>
+        <h1 style={{ fontSize: 'clamp(1.25rem, 4vw, 1.6rem)', fontWeight: 700, color: 'var(--text)' }}>📅 Calendario</h1>
         <button onClick={() => setModalOpen(true)} style={{ backgroundColor: '#f15922', color: '#fff', border: 'none', borderRadius: '8px', padding: '0.5rem 1rem', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer' }}>+ Nuevo evento</button>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: '1rem', alignItems: 'center' }}>
+        <select value={fCat} onChange={e => setFCat(e.target.value)} style={{ ...inputStyle, width: 'auto', padding: '0.4rem 0.6rem', fontSize: '0.8rem' }}>
+          <option value="">Todas las categorías</option>{CATEGORIAS.map(k => <option key={k} value={k}>{k}</option>)}
+        </select>
+        {permisos.ver_todas_tareas && (
+          <select value={fResp} onChange={e => setFResp(e.target.value)} style={{ ...inputStyle, width: 'auto', padding: '0.4rem 0.6rem', fontSize: '0.8rem' }}>
+            <option value="">Todo el equipo</option>{usuarios.map(u => <option key={u.id} value={u.id}>{u.nombre}</option>)}
+          </select>
+        )}
+        {([['tareas', '✅ Tareas'], ['eventos', '📌 Eventos'], ['copys', '✍️ Copys'], ['campanas', '📣 Campañas']] as const).map(([k, l]) => (
+          <label key={k} style={{ fontSize: '0.78rem', color: 'var(--text)', display: 'flex', gap: 4, alignItems: 'center', cursor: 'pointer' }}>
+            <input type="checkbox" checked={ver[k]} onChange={() => setVer(v => ({ ...v, [k]: !v[k] }))} style={{ accentColor: '#f15922' }} />{l}
+          </label>
+        ))}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: seleccionado ? 'minmax(0,1fr) 300px' : '1fr', gap: '1.25rem' }}>
         {/* Calendario */}
-        <div style={{ backgroundColor: '#fff', border: '1.5px solid #e8e8e8', borderRadius: '14px', padding: '1.25rem', overflowX: 'auto' }}>
+        <div style={{ backgroundColor: 'var(--bg-card)', border: '1.5px solid var(--border)', borderRadius: '14px', padding: '1.25rem', overflowX: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-            <button onClick={() => { if (mes === 0) { setMes(11); setAnio(a => a - 1) } else setMes(m => m - 1) }} style={{ background: 'none', border: '1.5px solid #e8e8e8', borderRadius: '8px', padding: '0.375rem 0.75rem', cursor: 'pointer' }}>‹</button>
-            <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#1a1a1a' }}>{MESES[mes]} {anio}</h2>
-            <button onClick={() => { if (mes === 11) { setMes(0); setAnio(a => a + 1) } else setMes(m => m + 1) }} style={{ background: 'none', border: '1.5px solid #e8e8e8', borderRadius: '8px', padding: '0.375rem 0.75rem', cursor: 'pointer' }}>›</button>
+            <button onClick={() => { if (mes === 0) { setMes(11); setAnio(a => a - 1) } else setMes(m => m - 1) }} style={{ background: 'none', border: '1.5px solid var(--border)', borderRadius: '8px', padding: '0.375rem 0.75rem', cursor: 'pointer' }}>‹</button>
+            <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)' }}>{MESES[mes]} {anio}</h2>
+            <button onClick={() => { if (mes === 11) { setMes(0); setAnio(a => a + 1) } else setMes(m => m + 1) }} style={{ background: 'none', border: '1.5px solid var(--border)', borderRadius: '8px', padding: '0.375rem 0.75rem', cursor: 'pointer' }}>›</button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '4px' }}>
             {DIAS_CORTO.map(d => <div key={d} style={{ textAlign: 'center', fontSize: '0.7rem', fontWeight: 700, color: '#a0a0a0', padding: '0.25rem' }}>{d}</div>)}
@@ -151,8 +178,10 @@ export default function CalendarioPage() {
             {celdas.map((dia, i) => {
               const evs = dia ? eventosDia(dia) : []
               const tars = dia ? tareasDia(dia) : []
+              const cps = dia ? copysDia(dia) : []
+              const cms = dia ? campsDia(dia) : []
               return (
-                <div key={i} style={{ minHeight: 72, borderRadius: '6px', padding: '0.25rem', backgroundColor: dia && esHoy(dia) ? '#f9ddd3' : '#fafafa', border: `1.5px solid ${dia && esHoy(dia) ? '#f15922' : '#f0f0f0'}` }}>
+                <div key={i} style={{ minHeight: 72, borderRadius: '6px', padding: '0.25rem', backgroundColor: dia && esHoy(dia) ? '#f9ddd3' : 'var(--bg)', border: `1.5px solid ${dia && esHoy(dia) ? '#f15922' : 'var(--border)'}` }}>
                   {dia && (
                     <>
                       <p style={{ fontSize: '0.7rem', fontWeight: esHoy(dia) ? 700 : 400, color: esHoy(dia) ? '#f15922' : '#555', marginBottom: '3px' }}>{dia}</p>
@@ -162,11 +191,15 @@ export default function CalendarioPage() {
                         </div>
                       ))}
                       {tars.slice(0, 2).map(t => (
-                        <div key={t.id} onClick={() => setSeleccionado({ tipo: 'tarea', data: t })} style={{ backgroundColor: PRIORIDAD_COLOR[t.prioridad] + '22', color: PRIORIDAD_COLOR[t.prioridad], border: `1px solid ${PRIORIDAD_COLOR[t.prioridad]}44`, borderRadius: '3px', padding: '1px 4px', marginBottom: '2px', fontSize: '0.55rem', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <div key={t.id} onClick={() => setDetalleId(t.id)} style={{ backgroundColor: PRIORIDAD_COLOR[t.prioridad] + '22', color: PRIORIDAD_COLOR[t.prioridad], border: `1px solid ${PRIORIDAD_COLOR[t.prioridad]}44`, borderRadius: '3px', padding: '1px 4px', marginBottom: '2px', fontSize: '0.55rem', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           ✅ {t.titulo}
                         </div>
                       ))}
-                      {(evs.length + tars.length) > 4 && <p style={{ fontSize: '0.55rem', color: '#888' }}>+{evs.length + tars.length - 4}</p>}
+                      {cps.slice(0, 1).map(c => (
+                        <div key={c.id} title={c.nombre} style={{ backgroundColor: '#3b82f622', color: '#3b82f6', border: '1px solid #3b82f644', borderRadius: 3, padding: '1px 4px', marginBottom: 2, fontSize: '0.55rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>✍️ {c.nombre}</div>
+                      ))}
+                      {cms.slice(0, 2).map(c => <div key={c.id} title={c.nombre} style={{ height: 4, borderRadius: 2, backgroundColor: c.color, marginBottom: 2, opacity: 0.8 }} />)}
+                      {(evs.length + tars.length) > 4 && <p style={{ fontSize: '0.55rem', color: 'var(--text-muted)' }}>+{evs.length + tars.length - 4}</p>}
                     </>
                   )}
                 </div>
@@ -174,62 +207,49 @@ export default function CalendarioPage() {
             })}
           </div>
           <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.7rem', color: '#888', display: 'flex', alignItems: 'center', gap: '0.375rem' }}><span style={{ width: 10, height: 10, borderRadius: '2px', backgroundColor: '#f15922', display: 'inline-block' }} /> Eventos</span>
-            <span style={{ fontSize: '0.7rem', color: '#888', display: 'flex', alignItems: 'center', gap: '0.375rem' }}><span style={{ width: 10, height: 10, borderRadius: '2px', backgroundColor: '#f59e0b44', border: '1px solid #f59e0b', display: 'inline-block' }} /> Tareas</span>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}><span style={{ width: 10, height: 10, borderRadius: '2px', backgroundColor: '#f15922', display: 'inline-block' }} /> Eventos</span>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}><span style={{ width: 10, height: 10, borderRadius: '2px', backgroundColor: '#f59e0b44', border: '1px solid #f59e0b', display: 'inline-block' }} /> Tareas</span>
           </div>
         </div>
 
         {/* Panel detalle */}
         {seleccionado && (
-          <div style={{ backgroundColor: '#fff', border: '1.5px solid #e8e8e8', borderRadius: '14px', padding: '1.25rem' }}>
+          <div style={{ backgroundColor: 'var(--bg-card)', border: '1.5px solid var(--border)', borderRadius: '14px', padding: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
               <div style={{ flex: 1 }}>
                 {seleccionado.tipo === 'evento' ? (
                   <>
-                    <div style={{ fontSize: '0.7rem', color: '#888', marginBottom: '0.25rem' }}>{TIPOS.find(t => t.key === seleccionado.data.tipo)?.emoji} {TIPOS.find(t => t.key === seleccionado.data.tipo)?.label}</div>
-                    <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1a1a1a', marginBottom: '0.25rem' }}>{seleccionado.data.titulo}</h3>
-                    <p style={{ fontSize: '0.75rem', color: '#888' }}>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>{TIPOS.find(t => t.key === seleccionado.data.tipo)?.emoji} {TIPOS.find(t => t.key === seleccionado.data.tipo)?.label}</div>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)', marginBottom: '0.25rem' }}>{seleccionado.data.titulo}</h3>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                       {new Date(seleccionado.data.fecha_inicio + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })}
                       {seleccionado.data.fecha_fin && ` → ${new Date(seleccionado.data.fecha_fin + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })}`}
                     </p>
                   </>
-                ) : (
-                  <>
-                    <div style={{ fontSize: '0.65rem', fontWeight: 700, color: PRIORIDAD_COLOR[seleccionado.data.prioridad], marginBottom: '0.25rem' }}>✅ Tarea</div>
-                    <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#1a1a1a', marginBottom: '0.25rem' }}>{seleccionado.data.titulo}</h3>
-                    <p style={{ fontSize: '0.75rem', color: '#888' }}>Deadline: {new Date(seleccionado.data.deadline + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })}</p>
-                    {seleccionado.data.asignados?.length > 0 && (
-                      <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
-                        {seleccionado.data.asignados.map((a: any) => (
-                          <span key={a.id} style={{ fontSize: '0.7rem', backgroundColor: a.avatar_color + '22', color: a.avatar_color, padding: '2px 8px', borderRadius: '99px', fontWeight: 600 }}>{a.nombre.split(' ')[0]}</span>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
+                ) : null}
               </div>
               <div style={{ display: 'flex', gap: '0.25rem' }}>
                 {seleccionado.tipo === 'evento' && (
                   <button onClick={() => eliminarEvento(seleccionado.data)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '1rem' }}>🗑️</button>
                 )}
-                <button onClick={() => setSeleccionado(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888', fontSize: '1.25rem' }}>×</button>
+                <button onClick={() => setSeleccionado(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '1.25rem' }}>×</button>
               </div>
             </div>
 
-            {seleccionado.data.descripcion && (
-              <p style={{ fontSize: '0.85rem', color: '#555', marginBottom: '1rem', lineHeight: 1.5 }}>{seleccionado.data.descripcion}</p>
+            {seleccionado?.data.descripcion && (
+              <p style={{ fontSize: '0.85rem', color: 'var(--text)', marginBottom: '1rem', lineHeight: 1.5 }}>{seleccionado.data.descripcion}</p>
             )}
 
-            {seleccionado.tipo === 'evento' && (
+            {seleccionado?.tipo === 'evento' && (
               <div>
-                <p style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1a1a1a', marginBottom: '0.75rem' }}>
+                <p style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text)', marginBottom: '0.75rem' }}>
                   Checklist ({checklist.filter(c => c.completado).length}/{checklist.length})
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', marginBottom: '0.75rem' }}>
                   {checklist.map(item => (
                     <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <input type="checkbox" checked={item.completado} onChange={() => toggleCheck(item)} style={{ width: 16, height: 16, accentColor: '#f15922', cursor: 'pointer' }} />
-                      <span style={{ fontSize: '0.85rem', color: item.completado ? '#a0a0a0' : '#1a1a1a', textDecoration: item.completado ? 'line-through' : 'none', flex: 1 }}>{item.texto}</span>
+                      <span style={{ fontSize: '0.85rem', color: item.completado ? '#a0a0a0' : 'var(--text)', textDecoration: item.completado ? 'line-through' : 'none', flex: 1 }}>{item.texto}</span>
                       <button onClick={() => eliminarCheck(item)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', fontSize: '0.875rem' }}>✕</button>
                     </div>
                   ))}
@@ -248,7 +268,7 @@ export default function CalendarioPage() {
       {modalOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}
           onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}>
-          <div style={{ backgroundColor: '#fff', borderRadius: '16px', padding: '2rem', width: '100%', maxWidth: 480, boxShadow: '0 20px 60px rgba(0,0,0,0.15)', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div style={{ backgroundColor: 'var(--bg-card)', borderRadius: '16px', padding: '2rem', width: '100%', maxWidth: 480, boxShadow: '0 20px 60px rgba(0,0,0,0.15)', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1.5rem' }}>Nuevo evento</h2>
             <Campo label="Título *">
               <input value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} style={inputStyle} />
@@ -285,12 +305,13 @@ export default function CalendarioPage() {
               </div>
             </Campo>
             <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <button onClick={() => setModalOpen(false)} style={{ flex: 1, padding: '0.625rem', border: '1.5px solid #e8e8e8', borderRadius: '8px', backgroundColor: '#fff', cursor: 'pointer', fontSize: '0.875rem', color: '#555' }}>Cancelar</button>
+              <button onClick={() => setModalOpen(false)} style={{ flex: 1, padding: '0.625rem', border: '1.5px solid var(--border)', borderRadius: '8px', backgroundColor: '#fff', cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text)' }}>Cancelar</button>
               <button onClick={crearEvento} style={{ flex: 2, padding: '0.625rem', border: 'none', borderRadius: '8px', backgroundColor: '#f15922', color: '#fff', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600 }}>Crear evento</button>
             </div>
           </div>
         </div>
       )}
+      {tareas.find(t => t.id === detalleId) && <TareaDetalle tarea={tareas.find(t => t.id === detalleId)!} usuario={usuario} usuarios={usuarios} permisos={permisos} onClose={() => setDetalleId(null)} onChanged={recargar} onEditar={() => setDetalleId(null)} />}
     </div>
   )
 }
