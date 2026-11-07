@@ -88,6 +88,21 @@ export default function CampanasPage() {
     setAbierta(null); cargar()
   }
 
+  async function asociarTarea(tareaId: string) {
+    if (!abierta || !tareaId) return
+    await supabase.from('mkt_tareas').update({ campana_id: abierta.id, actualizado_en: new Date().toISOString() }).eq('id', tareaId)
+    cargar()
+  }
+  async function quitarTarea(tareaId: string) {
+    await supabase.from('mkt_tareas').update({ campana_id: null, actualizado_en: new Date().toISOString() }).eq('id', tareaId)
+    cargar()
+  }
+  async function archivar(c: Campana) {
+    if (!confirm(`¿Archivar "${c.nombre}"? Sus tareas quedan intactas y siguen vinculadas.`)) return
+    await supabase.from('mkt_campanas').update({ estado: 'archivada' }).eq('id', c.id)
+    setAbierta(null); cargar()
+  }
+
   async function guardarResultados() {
     if (!abierta) return
     await supabase.from('mkt_campanas').update({ resultados: resultados || null }).eq('id', abierta.id)
@@ -185,14 +200,22 @@ export default function CampanasPage() {
                   </Campo>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={() => { abrirForm(abierta) }} style={btn('var(--bg)', 'var(--text)')}>✏️ Editar</button>
+                    {abierta.estado !== 'archivada' && <button onClick={() => archivar(abierta)} style={btn('var(--bg)', 'var(--text)')}>📦 Archivar</button>}
                     <button onClick={() => eliminar(abierta)} style={{ ...btn('#fef2f2', '#ef4444'), marginLeft: 'auto' }}>🗑️</button>
                   </div>
                 </>
               )}
               {tab === 'tareas' && (
                 <>
-                  <button onClick={() => setNuevaTarea(true)} style={{ ...btn('#f15922'), marginBottom: 10 }}>+ Nueva tarea en esta campaña</button>
-                  {tareasDe(abierta.id).length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', padding: 12 }}>Todavía no hay tareas vinculadas.</p>}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+                    <button onClick={() => setNuevaTarea(true)} style={btn('#f15922')}>+ Nueva tarea en esta campaña</button>
+                    <select value="" onChange={e => asociarTarea(e.target.value)} aria-label="Asociar una tarea existente" style={{ ...inp, width: 'auto', flex: '1 1 200px' }}>
+                      <option value="">🔗 Asociar una tarea existente…</option>
+                      {tareas.filter(t => !t.campana_id && !estaCerrada(t.estado)).map(t => <option key={t.id} value={t.id}>{t.titulo}</option>)}
+                    </select>
+                  </div>
+                  <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 8 }}>Son las mismas tareas de la sección Tareas: lo que cambies acá se ve allá y al revés.</p>
+                  {tareasDe(abierta.id).length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', padding: 12 }}>Todavía no hay tareas vinculadas. Creá una nueva o asociá una existente.</p>}
                   {tareasDe(abierta.id).sort((a, b) => a.deadline.localeCompare(b.deadline)).map(t => {
                     const e = estadoInfo(t.estado), p = prioridadInfo(t.prioridad)
                     return (
@@ -200,6 +223,7 @@ export default function CampanasPage() {
                         <span style={{ flex: '1 1 140px', fontSize: '0.84rem', fontWeight: 600, color: 'var(--text)' }}>{t.titulo}</span>
                         <span style={{ fontSize: '0.65rem', fontWeight: 700, backgroundColor: e.bg, color: e.color, padding: '2px 8px', borderRadius: 99 }}>{e.label}</span>
                         <span style={{ fontSize: '0.72rem', color: vencida(t) ? '#ef4444' : 'var(--text-muted)' }}>{t.responsable?.nombre.split(' ')[0]} · {fechaCorta(t.deadline)}</span>
+                        <button onClick={e => { e.stopPropagation(); quitarTarea(t.id) }} title="Quitar de la campaña (la tarea no se borra)" aria-label="Quitar de la campaña" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>✕</button>
                       </div>
                     )
                   })}

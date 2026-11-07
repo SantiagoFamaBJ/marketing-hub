@@ -94,9 +94,9 @@ export default function TareasPage() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.875rem', flexWrap: 'wrap', gap: '0.75rem' }}>
         <h1 style={{ fontSize: 'clamp(1.25rem, 4vw, 1.6rem)', fontWeight: 700, color: 'var(--text)' }}>✅ Tareas</h1>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', minWidth: 0, maxWidth: '100%' }}>
-          <div style={{ display: 'flex', border: '1.5px solid var(--border)', borderRadius: 8, overflowX: 'auto', maxWidth: '100%', minWidth: 0 }}>
+          <div role="tablist" aria-label="Vista de tareas" style={{ display: 'flex', flexWrap: 'wrap', gap: 4, minWidth: 0, maxWidth: '100%' }}>
             {([['kanban', '⬛ Kanban'], ['lista', '☰ Lista'], ['calendario', '📅 Mes'], ['semana', '🗓️ Semana'], ['persona', '👥 Equipo'], ['aprobaciones', `🔁 Aprobaciones${aprobarPend ? ` (${aprobarPend})` : ''}`]] as [Vista, string][]).map(([v, l]) => (
-              <button key={v} onClick={() => setVista(v)} style={{ padding: '0.4rem 0.7rem', border: 'none', whiteSpace: 'nowrap', backgroundColor: vista === v ? '#f15922' : 'var(--bg-card)', color: vista === v ? '#fff' : 'var(--text-muted)', cursor: 'pointer', fontSize: '0.78rem', fontWeight: vista === v ? 600 : 400 }}>{l}</button>
+              <button key={v} role="tab" aria-selected={vista === v} onClick={() => setVista(v)} style={{ padding: '0.4rem 0.7rem', border: '1.5px solid var(--border)', borderRadius: 8, whiteSpace: 'nowrap', backgroundColor: vista === v ? '#f15922' : 'var(--bg-card)', color: vista === v ? '#fff' : 'var(--text-muted)', cursor: 'pointer', fontSize: '0.78rem', fontWeight: vista === v ? 600 : 400 }}>{l}</button>
             ))}
           </div>
           <button onClick={() => setForm({ tarea: null })} style={{ backgroundColor: '#f15922', color: '#fff', border: 'none', borderRadius: 8, padding: '0.45rem 1rem', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>+ Nueva</button>
@@ -152,11 +152,14 @@ export default function TareasPage() {
 
       {/* KANBAN */}
       {!cargando && vista === 'kanban' && (
+        <>
+        <p className="kanban-hint" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0 0 8px' }}>↔ Deslizá para ver las {ESTADOS.length} columnas, o usá <button onClick={() => setVista('lista')} style={{ background: 'none', border: 'none', padding: 0, color: '#f15922', fontWeight: 600, cursor: 'pointer', fontSize: 'inherit' }}>Lista</button>.</p>
+        <style>{`.kanban-hint{display:none}.kanban-col{flex:0 0 270px}@media(max-width:600px){.kanban-hint{display:block}.kanban-col{flex:0 0 78vw}}`}</style>
         <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.75rem', scrollSnapType: 'x proximity', alignItems: 'flex-start' }}>
           {ESTADOS.map(col => {
             const items = filtradas.filter(t => t.estado === col.key).sort((a, b) => prioridadInfo(a.prioridad).rank - prioridadInfo(b.prioridad).rank || a.deadline.localeCompare(b.deadline))
             return (
-              <div key={col.key} style={{ flex: '0 0 270px', scrollSnapAlign: 'start', backgroundColor: 'var(--bg-card)', borderRadius: 12, padding: '0.75rem', border: '1.5px solid var(--border)', minHeight: 120 }}>
+              <div key={col.key} className="kanban-col" style={{ scrollSnapAlign: 'start', backgroundColor: 'var(--bg-card)', borderRadius: 12, padding: '0.75rem', border: '1.5px solid var(--border)', minHeight: 120 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: col.color }} />
@@ -165,13 +168,14 @@ export default function TareasPage() {
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', border: '1px solid var(--border)', padding: '1px 8px', borderRadius: 99 }}>{items.length}</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {items.map(t => <Card key={t.id} t={t} puedeEditar={puedeEditar(t)} onOpen={() => setDetalleId(t.id)} onMover={moverRapido} />)}
+                  {items.map(t => <Card key={t.id} t={t} campana={campanas.find(c => c.id === t.campana_id)} puedeEditar={puedeEditar(t)} onOpen={() => setDetalleId(t.id)} onMover={moverRapido} />)}
                   {items.length === 0 && <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.75rem 0' }}>—</p>}
                 </div>
               </div>
             )
           })}
         </div>
+        </>
       )}
 
       {/* LISTA */}
@@ -181,10 +185,11 @@ export default function TareasPage() {
           {filtradas.map(t => {
             const p = prioridadInfo(t.prioridad), e = estadoInfo(t.estado)
             return (
-              <div key={t.id} onClick={() => setDetalleId(t.id)} style={{ backgroundColor: 'var(--bg-card)', border: `1.5px solid ${vencida(t) ? '#fecaca' : 'var(--border)'}`, borderRadius: 10, padding: '0.7rem 0.9rem', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', flexWrap: 'wrap' }}>
+              <div key={t.id} role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetalleId(t.id) } }} onClick={() => setDetalleId(t.id)} style={{ backgroundColor: 'var(--bg-card)', border: `1.5px solid ${vencida(t) ? '#fecaca' : 'var(--border)'}`, borderRadius: 10, padding: '0.7rem 0.9rem', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '0.68rem', fontWeight: 700, backgroundColor: p.bg, color: p.color, padding: '3px 9px', borderRadius: 99 }}>{p.label}</span>
                 <p style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text)', flex: '1 1 160px', minWidth: 0 }}>{t.titulo}</p>
                 <span style={{ fontSize: '0.68rem', fontWeight: 700, backgroundColor: e.bg, color: e.color, padding: '3px 9px', borderRadius: 99 }}>{e.label}</span>
+                {campanaNombre(t.campana_id) && <span style={{ fontSize: '0.68rem', fontWeight: 600, color: campanas.find(c => c.id === t.campana_id)?.color || '#f15922' }}>📣 {campanaNombre(t.campana_id)}</span>}
                 {t.subtareas.total > 0 && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>☑️ {t.subtareas.hechas}/{t.subtareas.total}</span>}
                 <div style={{ display: 'flex', gap: 4 }}>
                   {t.asignados.map(a => <span key={a.id} title={a.nombre} style={{ fontSize: '0.68rem', backgroundColor: a.avatar_color + '22', color: a.avatar_color, padding: '2px 8px', borderRadius: 99, fontWeight: a.id === t.responsable_id ? 800 : 500, border: a.id === t.responsable_id ? `1px solid ${a.avatar_color}` : '1px solid transparent' }}>{a.nombre.split(' ')[0]}</span>)}
@@ -228,7 +233,7 @@ export default function TareasPage() {
   )
 }
 
-function Card({ t, puedeEditar, onOpen, onMover }: { t: Tarea; puedeEditar: boolean; onOpen: () => void; onMover: (t: Tarea, e: string) => void }) {
+function Card({ t, campana, puedeEditar, onOpen, onMover }: { t: Tarea; campana?: { nombre: string; color?: string }; puedeEditar: boolean; onOpen: () => void; onMover: (t: Tarea, e: string) => void }) {
   const p = prioridadInfo(t.prioridad)
   const venc = vencida(t)
   const proxima = !estaCerrada(t.estado) && t.deadline >= hoyISO() && t.deadline <= sumarDias(3)
@@ -240,6 +245,7 @@ function Card({ t, puedeEditar, onOpen, onMover }: { t: Tarea; puedeEditar: bool
         {t.categoria && <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>{t.categoria}</span>}
       </div>
       <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)', marginBottom: 6, lineHeight: 1.3, wordBreak: 'break-word' }}>{t.titulo}</p>
+      {campana && <p style={{ fontSize: '0.66rem', fontWeight: 600, color: campana.color || '#f15922', marginBottom: 6 }}>📣 {campana.nombre}</p>}
       {t.etiquetas.length > 0 && (
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
           {t.etiquetas.map(e => <span key={e.id} style={{ fontSize: '0.58rem', fontWeight: 600, backgroundColor: e.color + '22', color: e.color, padding: '1px 6px', borderRadius: 4 }}>{e.nombre}</span>)}
@@ -283,6 +289,7 @@ function CalendarioTareas({ tareas, mes, setMes, diaSel, setDiaSel, onOpen }: { 
         <strong style={{ color: 'var(--text)', textTransform: 'capitalize' }}>{mes.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</strong>
         <button onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() + 1, 1))} style={navBtn}>›</button>
       </div>
+      <style>{`.cal-dia:focus-visible{outline:3px solid #f15922;outline-offset:1px}`}</style>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 3 }}>
         {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, i) => <div key={i} style={{ textAlign: 'center', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', padding: 4 }}>{d}</div>)}
         {celdas.map((d, i) => {
@@ -290,7 +297,7 @@ function CalendarioTareas({ tareas, mes, setMes, diaSel, setDiaSel, onOpen }: { 
           const items = porDia[d] || []
           const sel = d === diaSel
           return (
-            <div key={i} onClick={() => setDiaSel(d)} style={{ minHeight: 58, border: sel ? '2px solid #f15922' : '1px solid var(--border)', borderRadius: 8, padding: 4, cursor: 'pointer', backgroundColor: d === hoy ? '#f9ddd322' : 'var(--bg-card)', overflow: 'hidden' }}>
+            <div key={i} role="button" tabIndex={0} aria-pressed={sel} aria-label={`${new Date(d + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}, ${items.length} tarea${items.length === 1 ? '' : 's'}`} className="cal-dia" onClick={() => setDiaSel(d)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDiaSel(d) } }} style={{ minHeight: 58, border: sel ? '2px solid #f15922' : '1px solid var(--border)', borderRadius: 8, padding: 4, cursor: 'pointer', backgroundColor: d === hoy ? '#f9ddd322' : 'var(--bg-card)', overflow: 'hidden' }}>
               <div style={{ fontSize: '0.72rem', fontWeight: d === hoy ? 800 : 500, color: d === hoy ? '#f15922' : 'var(--text)' }}>{Number(d.slice(8))}</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, marginTop: 3 }}>
                 {items.slice(0, 6).map(t => <span key={t.id} style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: estaCerrada(t.estado) ? '#10b981' : prioridadInfo(t.prioridad).color }} />)}
@@ -306,7 +313,7 @@ function CalendarioTareas({ tareas, mes, setMes, diaSel, setDiaSel, onOpen }: { 
         {delDia.map(t => {
           const e = estadoInfo(t.estado), p = prioridadInfo(t.prioridad)
           return (
-            <div key={t.id} onClick={() => onOpen(t.id)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.6rem 0.8rem', border: '1.5px solid var(--border)', borderLeft: `4px solid ${p.color}`, borderRadius: 10, backgroundColor: 'var(--bg-card)', cursor: 'pointer', flexWrap: 'wrap' }}>
+            <div key={t.id} role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(t.id) } }} onClick={() => onOpen(t.id)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.6rem 0.8rem', border: '1.5px solid var(--border)', borderLeft: `4px solid ${p.color}`, borderRadius: 10, backgroundColor: 'var(--bg-card)', cursor: 'pointer', flexWrap: 'wrap' }}>
               <span style={{ flex: '1 1 140px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>{t.titulo}</span>
               <span style={{ fontSize: '0.65rem', fontWeight: 700, backgroundColor: e.bg, color: e.color, padding: '2px 8px', borderRadius: 99 }}>{e.label}</span>
               <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{t.asignados.map(a => a.nombre.split(' ')[0]).join(', ')}</span>

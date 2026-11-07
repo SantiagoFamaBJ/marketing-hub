@@ -261,10 +261,11 @@ export async function versionActual(tareaId: string) {
 }
 
 // ───────── Recurrencia, reasignación y reprogramación ─────────
-function proximaFecha(deadline: string, recurrencia: string) {
+export function proximaFecha(deadline: string, recurrencia: string, anclaISO?: string) {
   const hoy = hoyISO()
   let d = new Date(deadline + 'T12:00:00')
-  const dia = d.getDate()
+  // Mensual: siempre el día de la tarea original (31 → fin de mes → vuelve al 31 cuando el mes lo permite)
+  const dia = anclaISO ? new Date(anclaISO + 'T12:00:00').getDate() : d.getDate()
   let guard = 0
   do {
     if (recurrencia === 'semanal') d.setDate(d.getDate() + 7)
@@ -283,12 +284,17 @@ export async function generarSiguienteRecurrente(tarea: Tarea, actor: Usuario) {
   if (!tarea.recurrencia || tarea.siguiente_generada) return
   const { data: marca } = await supabase.from('mkt_tareas').update({ siguiente_generada: true }).eq('id', tarea.id).eq('siguiente_generada', false).select('id')
   if (!marca || marca.length === 0) return // otra persona ya la generó
+  let ancla = tarea.deadline
+  if (tarea.recurrencia_origen_id) {
+    const { data: o } = await supabase.from('mkt_tareas').select('deadline').eq('id', tarea.recurrencia_origen_id).maybeSingle()
+    if (o?.deadline) ancla = o.deadline
+  }
   const { data: nueva } = await supabase.from('mkt_tareas').insert({
     titulo: tarea.titulo, descripcion: tarea.descripcion, prioridad: tarea.prioridad, categoria: tarea.categoria,
     campana_id: tarea.campana_id, creado_por: tarea.creado_por, responsable_id: tarea.responsable_id,
     requiere_aprobacion: tarea.requiere_aprobacion, recurrencia: tarea.recurrencia,
     recurrencia_origen_id: tarea.recurrencia_origen_id || tarea.id, estado: 'pendiente',
-    deadline: proximaFecha(tarea.deadline, tarea.recurrencia),
+    deadline: proximaFecha(tarea.deadline, tarea.recurrencia, ancla),
   }).select().single()
   if (!nueva) return
   const ids = tarea.asignados.map(a => a.id)

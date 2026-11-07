@@ -23,7 +23,7 @@ const TIPOS = [
   { key: 'reunion', label: 'Reunión', emoji: '👥' },
 ]
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-const DIAS_CORTO = ['D','L','M','X','J','V','S']
+const DIAS_CORTO = ['L','M','M','J','V','S','D'] // lunes primero, igual que Tareas → Mes
 const COLORES = ['#f15922','#3B82F6','#8B5CF6','#10B981','#F59E0B','#EC4899','#06B6D4']
 const PRIORIDAD_COLOR: Record<string,string> = { urgente:'#dc2626', alta:'#ef4444', media:'#f59e0b', baja:'#10b981' }
 
@@ -125,7 +125,7 @@ export default function CalendarioPage() {
     fetchChecklist(e.id)
   }
 
-  const primerDia = new Date(anio, mes, 1).getDay()
+  const primerDia = (new Date(anio, mes, 1).getDay() + 6) % 7
   const diasEnMes = new Date(anio, mes + 1, 0).getDate()
   const celdas: (number | null)[] = [...Array(primerDia).fill(null), ...Array.from({ length: diasEnMes }, (_, i) => i + 1)]
   while (celdas.length % 7 !== 0) celdas.push(null)
@@ -198,7 +198,15 @@ export default function CalendarioPage() {
                       {cps.slice(0, 1).map(c => (
                         <div key={c.id} title={c.nombre} style={{ backgroundColor: '#3b82f622', color: '#3b82f6', border: '1px solid #3b82f644', borderRadius: 3, padding: '1px 4px', marginBottom: 2, fontSize: '0.55rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>✍️ {c.nombre}</div>
                       ))}
-                      {cms.slice(0, 2).map(c => <div key={c.id} title={c.nombre} style={{ height: 4, borderRadius: 2, backgroundColor: c.color, marginBottom: 2, opacity: 0.8 }} />)}
+                      {cms.slice(0, 2).map(c => {
+                        const rotulo = i % 7 === 0 || dia === 1 || c.fecha_inicio === diaStr(dia)
+                        return (
+                          <div key={c.id} title={`📣 ${c.nombre}`} style={{ marginBottom: 2 }}>
+                            {rotulo && <div style={{ fontSize: '0.55rem', fontWeight: 700, color: c.color, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>📣 {c.nombre}</div>}
+                            <div style={{ height: 4, borderRadius: 2, backgroundColor: c.color, opacity: 0.8 }} />
+                          </div>
+                        )
+                      })}
                       {(evs.length + tars.length) > 4 && <p style={{ fontSize: '0.55rem', color: 'var(--text-muted)' }}>+{evs.length + tars.length - 4}</p>}
                     </>
                   )}
@@ -209,6 +217,8 @@ export default function CalendarioPage() {
           <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}><span style={{ width: 10, height: 10, borderRadius: '2px', backgroundColor: '#f15922', display: 'inline-block' }} /> Eventos</span>
             <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}><span style={{ width: 10, height: 10, borderRadius: '2px', backgroundColor: '#f59e0b44', border: '1px solid #f59e0b', display: 'inline-block' }} /> Tareas</span>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}><span style={{ width: 10, height: 10, borderRadius: '2px', backgroundColor: '#3b82f622', border: '1px solid #3b82f6', display: 'inline-block' }} /> Copys (fecha de publicación)</span>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}><span style={{ width: 14, height: 4, borderRadius: 2, backgroundColor: '#f15922', display: 'inline-block' }} /> Campañas (barra del color de cada campaña)</span>
           </div>
         </div>
 

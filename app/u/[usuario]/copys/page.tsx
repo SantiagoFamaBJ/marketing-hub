@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import CopysGuardados from '@/components/CopysGuardados'
+import CopysGuardados, { COPY_TIPOS } from '@/components/CopysGuardados'
 import { cargarPermisos } from '@/lib/tareas'
 
 type Usuario = { id: string; nombre: string; slug: string; avatar_color: string; avatar_emoji: string; rol: string }
@@ -35,6 +35,17 @@ export default function CopysPage() {
   const [nombreCopy, setNombreCopy] = useState('')
   const [copiado, setCopiado] = useState(false)
   const [permisos, setPermisos] = useState<any>(null)
+  const [nuevoOpen, setNuevoOpen] = useState(false)
+  const [nuevo, setNuevo] = useState({ nombre: '', contenido: '', tipo: '', campana_id: '', fecha: '' })
+  async function crearCopyLibre() {
+    if (!usuario || !nuevo.contenido.trim()) return
+    await supabase.from('mkt_copys_generados').insert({
+      nombre: nuevo.nombre.trim() || `Copy — ${new Date().toLocaleDateString('es-AR')}`, contenido_final: nuevo.contenido,
+      variables_usadas: {}, creado_por: usuario.id, estado: 'borrador', tipo: nuevo.tipo || null,
+      campana_id: nuevo.campana_id || null, fecha_publicacion: nuevo.fecha || null,
+    })
+    setNuevoOpen(false); setNuevo({ nombre: '', contenido: '', tipo: '', campana_id: '', fecha: '' }); setVista('historial'); fetchHistorial()
+  }
   const [campanas, setCampanas] = useState<{ id: string; nombre: string }[]>([])
   const [usuariosL, setUsuariosL] = useState<{ id: string; nombre: string }[]>([])
 
@@ -167,6 +178,10 @@ export default function CopysPage() {
               </button>
             ))}
           </div>
+          <button onClick={() => setNuevoOpen(true)} style={{
+            backgroundColor: '#f15922', color: '#fff', border: 'none',
+            borderRadius: '8px', padding: '0.5rem 1rem', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer',
+          }}>+ Nuevo copy</button>
           {usuario.rol === 'admin' && (
             <button onClick={abrirNuevaPlantilla} style={{
               backgroundColor: '#f15922', color: '#fff', border: 'none',
@@ -215,7 +230,7 @@ export default function CopysPage() {
             ))}
             {plantillas.length === 0 && (
               <div style={{ textAlign: 'center', padding: '2rem', color: '#888', fontSize: '0.875rem' }}>
-                No hay plantillas. {usuario.rol === 'admin' && 'Creá una.'}
+                No hay plantillas todavía. Podés escribir un copy desde cero con <strong>+ Nuevo copy</strong>; las plantillas se cargan en /ADMIN → Copys.
               </div>
             )}
           </div>
@@ -282,6 +297,25 @@ export default function CopysPage() {
       {/* VISTA HISTORIAL */}
       {vista === 'historial' && usuario && (
         <CopysGuardados usuario={usuario} permisos={permisos} copys={historial as any} campanas={campanas} usuarios={usuariosL} onChanged={fetchHistorial} />
+      )}
+
+      {nuevoOpen && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }} onClick={e => { if (e.target === e.currentTarget) setNuevoOpen(false) }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: 16, padding: '1.5rem', width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto' }}>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem' }}>Nuevo copy</h2>
+            <Campo label="Nombre"><input value={nuevo.nombre} onChange={e => setNuevo(n => ({ ...n, nombre: e.target.value }))} placeholder="Ej: Post curso blanqueamiento" style={inputStyle} /></Campo>
+            <Campo label="Texto *"><textarea value={nuevo.contenido} onChange={e => setNuevo(n => ({ ...n, contenido: e.target.value }))} rows={8} style={{ ...inputStyle, resize: 'vertical' }} /></Campo>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0 12px' }}>
+              <Campo label="Tipo"><select value={nuevo.tipo} onChange={e => setNuevo(n => ({ ...n, tipo: e.target.value }))} style={inputStyle}><option value="">Sin tipo</option>{COPY_TIPOS.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}</select></Campo>
+              <Campo label="Campaña"><select value={nuevo.campana_id} onChange={e => setNuevo(n => ({ ...n, campana_id: e.target.value }))} style={inputStyle}><option value="">Sin campaña</option>{campanas.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select></Campo>
+              <Campo label="Fecha de publicación"><input type="date" value={nuevo.fecha} onChange={e => setNuevo(n => ({ ...n, fecha: e.target.value }))} style={inputStyle} /></Campo>
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setNuevoOpen(false)} style={{ flex: 1, padding: '0.625rem', border: '1.5px solid #e8e8e8', borderRadius: 8, backgroundColor: '#fff', cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={crearCopyLibre} disabled={!nuevo.contenido.trim()} style={{ flex: 2, padding: '0.625rem', border: 'none', borderRadius: 8, backgroundColor: '#f15922', color: '#fff', fontWeight: 600, cursor: 'pointer', opacity: nuevo.contenido.trim() ? 1 : 0.6 }}>Crear borrador</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modal gestión de plantillas (admin) */}

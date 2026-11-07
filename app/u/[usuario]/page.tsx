@@ -145,18 +145,18 @@ export default function DashboardPage() {
 
       <div className="dash-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 2fr)', gap: '1.25rem', alignItems: 'start' }}>
         <div>
-          <Seccion titulo={verEquipo ? '🎯 Prioritarias del equipo' : '🎯 Mis prioridades'} vacio="Todo al día 🎉">
+          <Seccion cargando={cargando} titulo={verEquipo ? '🎯 Prioritarias del equipo' : '🎯 Mis prioridades'} vacio="Todo al día 🎉">
             {prioritarias.map(t => <FilaTarea key={t.id} t={t} onClick={() => setDetalleId(t.id)} mostrarResp={verEquipo} />)}
           </Seccion>
 
           {(pendAprob.length > 0 && (permisos.aprobar_tareas || verEquipo)) && (
-            <Seccion titulo={`🔁 ${permisos.aprobar_tareas ? 'Entregas pendientes de aprobación' : 'En revisión'}`} vacio="">
+            <Seccion cargando={cargando} titulo={`🔁 ${permisos.aprobar_tareas ? 'Entregas pendientes de aprobación' : 'En revisión'}`} vacio="">
               {pendAprob.map(t => <FilaTarea key={t.id} t={t} onClick={() => setDetalleId(t.id)} mostrarResp />)}
             </Seccion>
           )}
 
           {verEquipo && (
-            <Seccion titulo="👥 Actividad del equipo" vacio="">
+            <Seccion cargando={cargando} titulo="👥 Actividad del equipo" vacio="">
               {carga.map(c => (
                 <div key={c.u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0.6rem 0.8rem', border: '1.5px solid var(--border)', borderRadius: 10, backgroundColor: 'var(--bg-card)', marginBottom: 6 }}>
                   <span style={{ width: 28, height: 28, borderRadius: '50%', backgroundColor: c.u.avatar_color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem' }}>{c.u.avatar_emoji}</span>
@@ -172,7 +172,7 @@ export default function DashboardPage() {
         </div>
 
         <div>
-          <Seccion titulo="📅 Próximos eventos y campañas" vacio="Nada en los próximos 14 días.">
+          <Seccion cargando={cargando} titulo="📅 Próximos eventos y campañas" vacio="Nada en los próximos 14 días.">
             {eventos.map(e => (
               <Fila key={e.id} c={e.color || '#f15922'} t={e.titulo} s={`${fechaCorta(e.fecha_inicio)} · ${e.tipo}`} onClick={() => router.push(`/u/${usuario.slug}/calendario`)} />
             ))}
@@ -181,7 +181,7 @@ export default function DashboardPage() {
             ))}
           </Seccion>
 
-          <Seccion titulo="🕐 Actividad reciente" vacio="Sin actividad todavía.">
+          <Seccion cargando={cargando} titulo="🕐 Actividad reciente" vacio="Sin actividad todavía.">
             {hist.map(h => {
               const u = usuarios.find(x => x.id === h.usuario_id)
               return (
@@ -204,13 +204,14 @@ export default function DashboardPage() {
   )
 }
 
-function Seccion({ titulo, vacio, children }: { titulo: string; vacio: string; children: React.ReactNode }) {
+function Seccion({ titulo, vacio, cargando, children }: { titulo: string; vacio: string; cargando?: boolean; children: React.ReactNode }) {
   const hijos = Array.isArray(children) ? children.flat().filter(Boolean) : children ? [children] : []
-  if (hijos.length === 0 && !vacio) return null
+  if (cargando && !vacio) return null
+  if (!cargando && hijos.length === 0 && !vacio) return null
   return (
     <div style={{ marginBottom: '1.5rem' }}>
       <h2 style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>{titulo}</h2>
-      {hijos.length === 0 ? <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', padding: '1rem', textAlign: 'center', border: '1.5px dashed var(--border)', borderRadius: 10 }}>{vacio}</p> : children}
+      {cargando ? <p role="status" style={{ fontSize: '0.85rem', color: 'var(--text-muted)', padding: '1rem', textAlign: 'center', border: '1.5px dashed var(--border)', borderRadius: 10 }}>Cargando…</p> : hijos.length === 0 ? <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', padding: '1rem', textAlign: 'center', border: '1.5px dashed var(--border)', borderRadius: 10 }}>{vacio}</p> : children}
     </div>
   )
 }

@@ -63,7 +63,7 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
       const { data: p } = user ? await supabase.from('mkt_usuarios').select('*').eq('auth_user_id', user.id).eq('activo', true).maybeSingle() : { data: null }
       if (!p) { await supabase.auth.signOut(); sessionStorage.removeItem('mkt_usuario'); router.push('/'); return }
       sessionStorage.setItem('mkt_usuario', JSON.stringify(p)); setUsuario(p)
-      if (params?.usuario && params.usuario !== p.slug) router.replace(`/u/${p.slug}`)
+      if (params?.usuario && params.usuario !== p.slug) router.replace(pathname.replace(`/u/${params.usuario}`, `/u/${p.slug}`))
     })()
     fetchNotificaciones(u.id)
     fetchTareasVencidas(u.id)
