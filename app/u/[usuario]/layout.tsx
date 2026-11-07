@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import { cargarPermisos, Permisos, rolCorto, NOTIF_TIPOS, estadoInfo } from '@/lib/tareas'
 
 type Usuario = { id: string; nombre: string; slug: string; avatar_color: string; avatar_emoji: string; rol: string }
 type Notificacion = { id: string; tipo: string; titulo: string; mensaje: string | null; leida: boolean; creado_en: string }
@@ -28,6 +29,9 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
   const [notificaciones, setNotificaciones] = useState<Notificacion[]>([])
   const [notifOpen, setNotifOpen] = useState(false)
   const [tareasVencidas, setTareasVencidas] = useState(0)
+  const [permisos, setPermisos] = useState<Permisos | null>(null)
+  const [prefsOpen, setPrefsOpen] = useState(false)
+  const [apagadas, setApagadas] = useState<string[]>([])
   const [busqueda, setBusqueda] = useState('')
   const [resultados, setResultados] = useState<ResultadoBusqueda[]>([])
   const [buscando, setBuscando] = useState(false)
@@ -43,6 +47,8 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
     setUsuario(u)
     fetchNotificaciones(u.id)
     fetchTareasVencidas(u.id)
+    cargarPermisos(u.rol).then(setPermisos)
+    supabase.from('mkt_notif_prefs').select('tipo').eq('usuario_id', u.id).eq('activa', false).then(({ data }) => setApagadas((data || []).map((x: any) => x.tipo)))
     const dark = localStorage.getItem('darkMode') === 'true'
     setDarkMode(dark)
   }, [])
@@ -74,11 +80,11 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
   }
 
   async function fetchTareasVencidas(userId: string) {
-    const hoy = new Date().toISOString().split('T')[0]
+    const d0 = new Date(); const hoy = `${d0.getFullYear()}-${String(d0.getMonth() + 1).padStart(2, '0')}-${String(d0.getDate()).padStart(2, '0')}`
     const { data: asignadas } = await supabase.from('mkt_tarea_asignados').select('tarea_id').eq('usuario_id', userId)
     const ids = (asignadas || []).map((a: any) => a.tarea_id)
     if (ids.length === 0) { setTareasVencidas(0); return }
-    const { data } = await supabase.from('mkt_tareas').select('id').in('id', ids).lt('deadline', hoy).neq('estado', 'hecho')
+    const { data } = await supabase.from('mkt_tareas').select('id').in('id', ids).lt('deadline', hoy).not('estado', 'in', '(finalizada,hecho)')
     setTareasVencidas((data || []).length)
   }
 
@@ -101,7 +107,7 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
       supabase.from('mkt_eventos').select('id, titulo, tipo').ilike('titulo', `%${q}%`).limit(3),
       supabase.from('mkt_copys_generados').select('id, nombre').ilike('nombre', `%${q}%`).limit(3),
     ])
-    tareas?.forEach(t => res.push({ id: t.id, tipo: 'tarea', titulo: t.titulo, subtitulo: t.estado }))
+    if (permisos?.ver_todas_tareas) tareas?.forEach(t => res.push({ id: t.id, tipo: 'tarea', titulo: t.titulo, subtitulo: estadoInfo(t.estado).label }))
     eventos?.forEach(e => res.push({ id: e.id, tipo: 'evento', titulo: e.titulo, subtitulo: e.tipo }))
     copys?.forEach(c => res.push({ id: c.id, tipo: 'copy', titulo: c.nombre }))
     setResultados(res)
@@ -111,6 +117,8 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
   if (!usuario) return null
 
   const base = `/u/${usuario.slug}`
+  const navVisibles = navItems.filter(i => i.href !== '/campanas' || !permisos || permisos.gestionar_campanas)
+  const veReportes = !!permisos?.ver_reportes
   const isActive = (href: string) => pathname === (href === '' ? base : `${base}${href}`)
 
   const c = {
@@ -168,8 +176,8 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
         </div>
         <nav style={{ padding: '0.625rem 0.75rem', flex: 1, overflowY: 'auto' }}>
           <p style={{ fontSize: '0.62rem', fontWeight: 700, color: c.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', padding: '0 0.5rem', marginBottom: '0.25rem', marginTop: '0.25rem' }}>General</p>
-          {navItems.map(item => <NavLink key={item.href} {...item} badge={item.href === '/tareas' && tareasVencidas > 0 ? tareasVencidas : undefined} />)}
-          {usuario.rol === 'mkt_reporte' && (
+          {navVisibles.map(item => <NavLink key={item.href} {...item} badge={item.href === '/tareas' && tareasVencidas > 0 ? tareasVencidas : undefined} />)}
+          {veReportes && (
             <>
               <p style={{ fontSize: '0.62rem', fontWeight: 700, color: c.textMuted, textTransform: 'uppercase', letterSpacing: '0.08em', padding: '0 0.5rem', marginBottom: '0.25rem', marginTop: '0.875rem' }}>Gestión</p>
               {reporteItems.map(item => <NavLink key={item.href} {...item} />)}
@@ -185,7 +193,7 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
             <div style={{ width: 34, height: 34, borderRadius: '50%', backgroundColor: usuario.avatar_color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>{usuario.avatar_emoji}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ fontSize: '0.8rem', fontWeight: 600, color: c.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{usuario.nombre}</p>
-              <p style={{ fontSize: '0.68rem', color: c.textMuted }}>{usuario.rol === 'mkt_reporte' ? 'MKT + Reporte' : 'Marketing'}</p>
+              <p style={{ fontSize: '0.68rem', color: c.textMuted }}>{rolCorto(usuario.rol)}</p>
             </div>
             <button onClick={() => { sessionStorage.removeItem('mkt_usuario'); router.push('/') }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', padding: '4px', borderRadius: '6px', color: c.textMuted }}>↩</button>
           </div>
@@ -202,8 +210,8 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
           <button onClick={() => setSidebarOpen(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: c.textMuted }}>×</button>
         </div>
         <nav style={{ padding: '0.625rem 0.75rem', flex: 1, overflowY: 'auto' }}>
-          {navItems.map(item => <NavLink key={item.href} {...item} badge={item.href === '/tareas' && tareasVencidas > 0 ? tareasVencidas : undefined} />)}
-          {usuario.rol === 'mkt_reporte' && reporteItems.map(item => <NavLink key={item.href} {...item} />)}
+          {navVisibles.map(item => <NavLink key={item.href} {...item} badge={item.href === '/tareas' && tareasVencidas > 0 ? tareasVencidas : undefined} />)}
+          {veReportes && reporteItems.map(item => <NavLink key={item.href} {...item} />)}
         </nav>
         <div style={{ padding: '0.75rem 1rem', borderTop: `1px solid ${c.border}`, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <div style={{ width: 32, height: 32, borderRadius: '50%', backgroundColor: usuario.avatar_color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>{usuario.avatar_emoji}</div>
@@ -231,7 +239,7 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
       </header>
 
       {/* Main */}
-      <main className="main-content" style={{ marginLeft: 240, flex: 1, minHeight: '100vh', backgroundColor: c.bg, display: 'flex', flexDirection: 'column' }}>
+      <main className="main-content" style={{ marginLeft: 240, flex: 1, minWidth: 0, minHeight: '100vh', backgroundColor: c.bg, display: 'flex', flexDirection: 'column' }}>
         {/* Topbar desktop */}
         <div className="topbar-desktop" style={{ position: 'sticky', top: 0, backgroundColor: c.sidebar, borderBottom: `1px solid ${c.border}`, padding: '0.75rem 2rem', display: 'flex', alignItems: 'center', gap: '1rem', zIndex: 90 }}>
           {/* Búsqueda */}
@@ -271,30 +279,6 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
               🔔
               {notificaciones.length > 0 && <span style={{ fontSize: '0.65rem', fontWeight: 700, backgroundColor: '#ef4444', color: '#fff', borderRadius: '99px', padding: '1px 5px' }}>{notificaciones.length}</span>}
             </button>
-            {notifOpen && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: 300, backgroundColor: c.sidebar, border: `1.5px solid ${c.border}`, borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 200, overflow: 'hidden' }}>
-                <div style={{ padding: '0.875rem 1rem', borderBottom: `1px solid ${c.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <p style={{ fontWeight: 700, fontSize: '0.875rem', color: c.text }}>Notificaciones</p>
-                  {notificaciones.length > 0 && <button onClick={marcarTodasLeidas} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.72rem', color: '#f15922', fontWeight: 600 }}>Marcar todas leídas</button>}
-                </div>
-                {notificaciones.length === 0 ? (
-                  <p style={{ padding: '1.5rem', fontSize: '0.85rem', color: c.textMuted, textAlign: 'center' }}>Sin notificaciones nuevas 🎉</p>
-                ) : (
-                  <div style={{ maxHeight: 300, overflowY: 'auto' }}>
-                    {notificaciones.map(n => (
-                      <div key={n.id} style={{ padding: '0.75rem 1rem', borderBottom: `1px solid ${c.border}`, display: 'flex', gap: '0.625rem', backgroundColor: darkMode ? '#1f1510' : '#fff9f7' }}>
-                        <div style={{ flex: 1 }}>
-                          <p style={{ fontSize: '0.825rem', fontWeight: 600, color: c.text, marginBottom: '2px' }}>{n.titulo}</p>
-                          {n.mensaje && <p style={{ fontSize: '0.775rem', color: c.textMuted }}>{n.mensaje}</p>}
-                          <p style={{ fontSize: '0.68rem', color: c.textMuted, marginTop: '3px' }}>{new Date(n.creado_en).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</p>
-                        </div>
-                        <button onClick={() => marcarLeida(n.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: c.textMuted, fontSize: '0.875rem', flexShrink: 0, alignSelf: 'flex-start' }}>✕</button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </div>
 
@@ -302,6 +286,51 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
           {children}
         </div>
       </main>
+
+      {notifOpen && (
+        <>
+          <div onClick={() => { setNotifOpen(false); setPrefsOpen(false) }} style={{ position: 'fixed', inset: 0, zIndex: 190 }} />
+          <div style={{ position: 'fixed', top: 58, right: 12, width: 'min(340px, calc(100vw - 24px))', backgroundColor: c.sidebar, border: `1.5px solid ${c.border}`, borderRadius: 12, boxShadow: '0 8px 30px rgba(0,0,0,0.18)', zIndex: 200, overflow: 'hidden' }}>
+            <div style={{ padding: '0.75rem 1rem', borderBottom: `1px solid ${c.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <p style={{ fontWeight: 700, fontSize: '0.875rem', color: c.text }}>{prefsOpen ? 'Qué avisos querés recibir' : 'Notificaciones'}</p>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                {!prefsOpen && notificaciones.length > 0 && <button onClick={marcarTodasLeidas} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.72rem', color: '#f15922', fontWeight: 600 }}>Marcar leídas</button>}
+                <button onClick={() => setPrefsOpen(!prefsOpen)} title="Preferencias" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', color: c.textMuted }}>{prefsOpen ? '←' : '⚙️'}</button>
+              </div>
+            </div>
+            {prefsOpen ? (
+              <div style={{ maxHeight: 340, overflowY: 'auto', padding: '0.5rem 1rem' }}>
+                {Object.entries(NOTIF_TIPOS).map(([tipo, label]) => (
+                  <label key={tipo} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', fontSize: '0.82rem', color: c.text, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={!apagadas.includes(tipo)} style={{ accentColor: '#f15922', width: 16, height: 16 }}
+                      onChange={async e => {
+                        const activa = e.target.checked
+                        setApagadas(prev => activa ? prev.filter(x => x !== tipo) : [...prev, tipo])
+                        await supabase.from('mkt_notif_prefs').upsert({ usuario_id: usuario.id, tipo, activa })
+                      }} />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            ) : notificaciones.length === 0 ? (
+              <p style={{ padding: '1.5rem', fontSize: '0.85rem', color: c.textMuted, textAlign: 'center' }}>Sin notificaciones nuevas 🎉</p>
+            ) : (
+              <div style={{ maxHeight: 340, overflowY: 'auto' }}>
+                {notificaciones.map(n => (
+                  <div key={n.id} style={{ padding: '0.7rem 1rem', borderBottom: `1px solid ${c.border}`, display: 'flex', gap: '0.625rem', backgroundColor: darkMode ? '#1f1510' : '#fff9f7' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: '0.825rem', fontWeight: 600, color: c.text, marginBottom: 2 }}>{n.titulo}</p>
+                      {n.mensaje && <p style={{ fontSize: '0.775rem', color: c.textMuted, wordBreak: 'break-word' }}>{n.mensaje}</p>}
+                      <p style={{ fontSize: '0.68rem', color: c.textMuted, marginTop: 3 }}>{new Date(n.creado_en).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                    </div>
+                    <button onClick={() => marcarLeida(n.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: c.textMuted, fontSize: '0.875rem', flexShrink: 0, alignSelf: 'flex-start' }}>✓</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       <style>{`
         @media (max-width: 768px) {

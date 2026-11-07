@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { cargarTareas, ROLES, PERMISOS, ESTADOS, estadoInfo, estaCerrada } from '@/lib/tareas'
 
 type Usuario = { id: string; nombre: string; slug: string; avatar_color: string; avatar_emoji: string; rol: string; activo: boolean }
 type Plantilla = { id: string; nombre: string; categoria: string; contenido: string; variables: any[]; activa: boolean }
@@ -14,8 +15,7 @@ const EMOJIS = ['😊','🧡','⭐','🌟','💪','🎯','🚀','🌸','🦋','�
 const COLORES_AVATAR = ['#f15922','#3B82F6','#8B5CF6','#10B981','#F59E0B','#EC4899','#06B6D4','#84CC16','#F97316','#6366F1']
 const CATEGORIAS_MANUAL = ['Identidad visual','Procesos','Herramientas','General']
 const CATEGORIAS_PLANTILLA = ['Cursos','Congresos','Productos','Institucional','General']
-const PRIORIDAD_COLOR: Record<string,string> = { alta:'#ef4444', media:'#f59e0b', baja:'#10b981' }
-const ESTADO_LABEL: Record<string,string> = { por_hacer:'Por hacer', en_progreso:'En progreso', hecho:'Hecho' }
+const PRIORIDAD_COLOR: Record<string,string> = { urgente:'#dc2626', alta:'#ef4444', media:'#f59e0b', baja:'#10b981' }
 
 const slugify = (t: string) => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')
 
@@ -30,7 +30,7 @@ function Campo({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-type Tab = 'usuarios' | 'plantillas' | 'etiquetas' | 'manuales' | 'tareas'
+type Tab = 'usuarios' | 'permisos' | 'plantillas' | 'etiquetas' | 'manuales' | 'tareas'
 
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>('usuarios')
@@ -64,11 +64,12 @@ export default function AdminPage() {
 
   // Tareas
   const [tareas, setTareas] = useState<Tarea[]>([])
+  const [permisosMatriz, setPermisosMatriz] = useState<Record<string, Record<string, boolean>>>({})
 
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    fetchUsuarios(); fetchPlantillas(); fetchEtiquetas(); fetchManuales(); fetchTareas()
+    fetchUsuarios(); fetchPlantillas(); fetchEtiquetas(); fetchManuales(); fetchTareas(); fetchPermisos()
   }, [])
 
   // FETCH
@@ -89,15 +90,17 @@ export default function AdminPage() {
     setManuales(data || [])
   }
   async function fetchTareas() {
-    const { data: td } = await supabase.from('mkt_tareas').select('*').order('deadline', { ascending: true })
-    if (!td) return
-    const completas = await Promise.all(td.map(async t => {
-      const { data: ad } = await supabase.from('mkt_tarea_asignados').select('usuario_id').eq('tarea_id', t.id)
-      const aIds = (ad || []).map((a: any) => a.usuario_id)
-      const { data: au } = await supabase.from('mkt_usuarios').select('*').in('id', aIds.length > 0 ? aIds : ['00000000-0000-0000-0000-000000000000'])
-      return { ...t, asignados: au || [] }
-    }))
-    setTareas(completas)
+    setTareas((await cargarTareas()) as any)
+  }
+  async function fetchPermisos() {
+    const { data } = await supabase.from('mkt_permisos').select('*')
+    const m: Record<string, Record<string, boolean>> = {}
+    ;(data || []).forEach((p: any) => { (m[p.rol] ||= {})[p.permiso] = p.habilitado })
+    setPermisosMatriz(m)
+  }
+  async function togglePermiso(rol: string, permiso: string, habilitado: boolean) {
+    setPermisosMatriz(prev => ({ ...prev, [rol]: { ...(prev[rol] || {}), [permiso]: habilitado } }))
+    await supabase.from('mkt_permisos').upsert({ rol, permiso, habilitado })
   }
 
   // USUARIOS
@@ -114,10 +117,6 @@ export default function AdminPage() {
   }
   async function toggleActivoUsuario(u: Usuario) {
     await supabase.from('mkt_usuarios').update({ activo: !u.activo }).eq('id', u.id); fetchUsuarios()
-  }
-  async function eliminarUsuario(u: Usuario) {
-    if (!confirm(`¿Eliminás a ${u.nombre}?`)) return
-    await supabase.from('mkt_usuarios').delete().eq('id', u.id); fetchUsuarios()
   }
 
   // PLANTILLAS
@@ -190,11 +189,12 @@ export default function AdminPage() {
     await supabase.from('mkt_tareas').delete().eq('id', t.id); fetchTareas()
   }
   async function cambiarEstadoTarea(t: Tarea, estado: string) {
-    await supabase.from('mkt_tareas').update({ estado }).eq('id', t.id); fetchTareas()
+    await supabase.from('mkt_tareas').update({ estado, finalizada_en: estado === 'finalizada' ? new Date().toISOString() : null }).eq('id', t.id); fetchTareas()
   }
 
   const TABS: { key: Tab; label: string; emoji: string }[] = [
     { key: 'usuarios', label: 'Usuarios', emoji: '👥' },
+    { key: 'permisos', label: 'Permisos', emoji: '🔐' },
     { key: 'plantillas', label: 'Copys', emoji: '✍️' },
     { key: 'etiquetas', label: 'Etiquetas', emoji: '🏷️' },
     { key: 'manuales', label: 'Manuales', emoji: '📚' },
@@ -238,7 +238,7 @@ export default function AdminPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                       <p style={{ fontWeight: 600, color: '#1a1a1a', fontSize: '0.9rem' }}>{u.nombre}</p>
                       <span style={{ fontSize: '0.65rem', fontWeight: 600, color: u.rol === 'mkt_reporte' ? '#f15922' : '#3b82f6', backgroundColor: u.rol === 'mkt_reporte' ? '#f9ddd3' : '#eff6ff', padding: '2px 8px', borderRadius: '99px', textTransform: 'uppercase' }}>
-                        {u.rol === 'mkt_reporte' ? 'MKT + Reporte' : 'MKT'}
+                        {ROLES[u.rol]?.split(' (')[0] || u.rol}
                       </span>
                       {!u.activo && <span style={{ fontSize: '0.65rem', color: '#888', backgroundColor: '#f4f4f4', padding: '2px 8px', borderRadius: '99px' }}>inactivo</span>}
                     </div>
@@ -247,12 +247,39 @@ export default function AdminPage() {
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <button onClick={() => { setEditandoUsuario(u); setFormUsuario({ nombre: u.nombre, slug: u.slug, avatar_color: u.avatar_color, avatar_emoji: u.avatar_emoji, rol: u.rol }); setModalUsuario(true) }} style={{ background: '#f4f4f4', border: 'none', borderRadius: '8px', padding: '0.375rem 0.75rem', cursor: 'pointer', fontSize: '0.8rem', color: '#444' }}>Editar</button>
                     <button onClick={() => toggleActivoUsuario(u)} style={{ background: u.activo ? '#fffbeb' : '#f0fdf4', border: 'none', borderRadius: '8px', padding: '0.375rem 0.75rem', cursor: 'pointer', fontSize: '0.8rem', color: u.activo ? '#f59e0b' : '#10b981' }}>{u.activo ? 'Desactivar' : 'Activar'}</button>
-                    <button onClick={() => eliminarUsuario(u)} style={{ background: '#fef2f2', border: 'none', borderRadius: '8px', padding: '0.375rem 0.75rem', cursor: 'pointer', fontSize: '0.8rem', color: '#ef4444' }}>Eliminar</button>
                   </div>
                 </div>
               ))}
             </div>
           </>
+        )}
+
+        {/* ===== PERMISOS ===== */}
+        {tab === 'permisos' && (
+          <div style={{ backgroundColor: '#fff', border: '1.5px solid #e8e8e8', borderRadius: '12px', padding: '1rem 1.25rem', overflowX: 'auto' }}>
+            <p style={{ fontSize: '0.8rem', color: '#888', marginBottom: '1rem' }}>Qué puede hacer cada rol. Los cambios se aplican al instante (la persona ve el cambio al recargar la página).</p>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', minWidth: 460 }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: 'left', padding: '8px 4px', color: '#555' }}>Permiso</th>
+                  {Object.entries(ROLES).map(([k, v]) => <th key={k} style={{ padding: '8px 4px', color: '#555', fontSize: '0.72rem' }}>{v.split(' (')[0]}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(PERMISOS).map(([perm, label]) => (
+                  <tr key={perm} style={{ borderTop: '1px solid #f0f0f0' }}>
+                    <td style={{ padding: '10px 4px', color: '#1a1a1a' }}>{label}</td>
+                    {Object.keys(ROLES).map(rol => (
+                      <td key={rol} style={{ textAlign: 'center' }}>
+                        <input type="checkbox" checked={!!permisosMatriz[rol]?.[perm]} onChange={e => togglePermiso(rol, perm, e.target.checked)} style={{ width: 18, height: 18, accentColor: '#f15922', cursor: 'pointer' }} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p style={{ fontSize: '0.75rem', color: '#a0a0a0', marginTop: '1rem' }}>Las tareas compartidas siempre son visibles para sus colaboradores, aunque el rol no pueda ver todas las tareas.</p>
+          </div>
         )}
 
         {/* ===== PLANTILLAS ===== */}
@@ -341,16 +368,14 @@ export default function AdminPage() {
                   <p style={{ fontWeight: 600, color: '#1a1a1a', fontSize: '0.875rem' }}>{t.titulo}</p>
                   <div style={{ display: 'flex', gap: '0.5rem', marginTop: '2px', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '0.7rem', color: '#888' }}>📅 {new Date(t.deadline + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}</span>
-                    <span style={{ fontSize: '0.7rem', color: '#888', backgroundColor: '#f4f4f4', padding: '2px 6px', borderRadius: '4px' }}>{ESTADO_LABEL[t.estado]}</span>
+                    <span style={{ fontSize: '0.7rem', color: '#888', backgroundColor: '#f4f4f4', padding: '2px 6px', borderRadius: '4px' }}>{estadoInfo(t.estado).label}</span>
                     {t.asignados.map(a => <span key={a.id} style={{ fontSize: '0.7rem', backgroundColor: a.avatar_color + '22', color: a.avatar_color, padding: '2px 6px', borderRadius: '99px', fontWeight: 600 }}>{a.nombre.split(' ')[0]}</span>)}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  {t.estado !== 'hecho' && (
+                  {!estaCerrada(t.estado) && (
                     <select value={t.estado} onChange={e => cambiarEstadoTarea(t, e.target.value)} style={{ padding: '0.25rem 0.5rem', border: '1.5px solid #e8e8e8', borderRadius: '6px', fontSize: '0.75rem', color: '#555', backgroundColor: '#fff', cursor: 'pointer' }}>
-                      <option value="por_hacer">Por hacer</option>
-                      <option value="en_progreso">En progreso</option>
-                      <option value="hecho">Hecho</option>
+                      {ESTADOS.map(e => <option key={e.key} value={e.key}>{e.label}</option>)}
                     </select>
                   )}
                   <button onClick={() => eliminarTarea(t)} style={{ background: '#fef2f2', border: 'none', borderRadius: '8px', padding: '0.375rem 0.75rem', cursor: 'pointer', fontSize: '0.8rem', color: '#ef4444' }}>Eliminar</button>
@@ -381,8 +406,7 @@ export default function AdminPage() {
             </Campo>
             <Campo label="Rol">
               <select value={formUsuario.rol} onChange={e => setFormUsuario(f => ({ ...f, rol: e.target.value }))} style={inputStyle}>
-                <option value="mkt">MKT — acceso general</option>
-                <option value="mkt_reporte">MKT + Reporte — acceso general + reportes</option>
+                {Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </Campo>
             <Campo label="Emoji">

@@ -15,6 +15,10 @@ const ACCION_INFO: Record<string, { label: string; emoji: string; color: string 
   tarea_movida: { label: 'Movió una tarea', emoji: '↕️', color: '#f59e0b' },
   tarea_eliminada: { label: 'Eliminó una tarea', emoji: '🗑️', color: '#ef4444' },
   comentario_agregado: { label: 'Comentó en una tarea', emoji: '💬', color: '#8b5cf6' },
+  revision_enviada: { label: 'Envió a revisión', emoji: '📤', color: '#8b5cf6' },
+  tarea_aprobada: { label: 'Aprobó una tarea', emoji: '👍', color: '#10b981' },
+  correcciones_pedidas: { label: 'Pidió correcciones', emoji: '🔁', color: '#ef4444' },
+  tarea_reasignada: { label: 'Reasignó una tarea', emoji: '🔀', color: '#3b82f6' },
 }
 
 export default function HistorialPage() {

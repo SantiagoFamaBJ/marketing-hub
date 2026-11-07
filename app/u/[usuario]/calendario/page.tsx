@@ -19,7 +19,7 @@ const TIPOS = [
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const DIAS_CORTO = ['D','L','M','X','J','V','S']
 const COLORES = ['#f15922','#3B82F6','#8B5CF6','#10B981','#F59E0B','#EC4899','#06B6D4']
-const PRIORIDAD_COLOR: Record<string,string> = { alta:'#ef4444', media:'#f59e0b', baja:'#10b981' }
+const PRIORIDAD_COLOR: Record<string,string> = { urgente:'#dc2626', alta:'#ef4444', media:'#f59e0b', baja:'#10b981' }
 
 const inputStyle: React.CSSProperties = { width:'100%', padding:'0.625rem 0.875rem', border:'1.5px solid #e8e8e8', borderRadius:'8px', fontSize:'0.875rem', outline:'none', color:'#1a1a1a', backgroundColor:'#fff' }
 
@@ -57,7 +57,7 @@ export default function CalendarioPage() {
   }
 
   async function fetchTareas() {
-    const { data: td } = await supabase.from('mkt_tareas').select('*').neq('estado', 'hecho')
+    const { data: td } = await supabase.from('mkt_tareas').select('*').not('estado', 'in', '(finalizada,hecho)')
     if (!td) return
     const completas = await Promise.all(td.map(async t => {
       const { data: ad } = await supabase.from('mkt_tarea_asignados').select('usuario_id').eq('tarea_id', t.id)
