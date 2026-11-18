@@ -15,6 +15,8 @@ const navItems = [
   { href: '', label: 'Dashboard', emoji: '🏠' },
   { href: '/tareas', label: 'Tareas', emoji: '✅' },
   { href: '/campanas', label: 'Campañas', emoji: '📣' },
+  { href: '/objetivos', label: 'Objetivos', emoji: '🎯' },
+  { href: '/responsabilidades', label: 'Responsabilidades', emoji: '🧭' },
   { href: '/copys', label: 'Copys', emoji: '✍️' },
   { href: '/calendario', label: 'Calendario', emoji: '📅' },
   { href: '/manuales', label: 'Manuales', emoji: '📚' },

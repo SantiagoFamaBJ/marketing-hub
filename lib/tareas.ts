@@ -5,7 +5,7 @@ export type Usuario = { id: string; nombre: string; slug: string; avatar_color: 
 export type Etiqueta = { id: string; nombre: string; color: string }
 export type Tarea = {
   id: string; titulo: string; descripcion: string | null
-  estado: string; prioridad: string; deadline: string
+  estado: string; prioridad: string; deadline: string | null
   creado_por: string | null; responsable_id: string | null
   categoria: string | null; campana_id: string | null
   requiere_aprobacion: boolean
@@ -57,9 +57,11 @@ export function isoLocal(d: Date) {
 }
 export const hoyISO = () => isoLocal(new Date())
 export const sumarDias = (n: number, base = new Date()) => { const d = new Date(base); d.setDate(d.getDate() + n); return isoLocal(d) }
-export const fechaCorta = (iso: string) => new Date(iso + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
-export const fechaLarga = (iso: string) => new Date(iso + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
-export const vencida = (t: { deadline: string; estado: string }) => !estaCerrada(t.estado) && t.deadline < hoyISO()
+export const fechaCorta = (iso: string | null | undefined) => !iso ? 'Sin fecha' : new Date(iso + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
+export const fechaLarga = (iso: string | null | undefined) => !iso ? 'Sin fecha' : new Date(iso + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
+export const vencida = (t: { deadline: string | null; estado: string }) => !!t.deadline && !estaCerrada(t.estado) && t.deadline < hoyISO()
+/** Orden por fecha: las tareas sin fecha van al final. */
+export const porFecha = (a: { deadline: string | null }, b: { deadline: string | null }) => (a.deadline || '9999-12-31').localeCompare(b.deadline || '9999-12-31')
 
 // ───────── Permisos ─────────
 export const PERMISOS: Record<string, string> = {
@@ -173,13 +175,14 @@ export async function notificar(destinos: string[], actorId: string | null, tipo
 /** Avisos de vencimiento: una sola vez por tarea y tipo, para no saturar. */
 export async function generarAvisosVencimiento(uid: string, tareas: Tarea[]) {
   const hoy = hoyISO(), en3 = sumarDias(3)
-  const mias = tareas.filter(t => !estaCerrada(t.estado) && (t.responsable_id === uid || t.asignados.some(a => a.id === uid)))
+  const mias = tareas.filter(t => t.deadline && !estaCerrada(t.estado) && (t.responsable_id === uid || t.asignados.some(a => a.id === uid)))
   if (mias.length === 0) return
   const { data: prev } = await supabase.from('mkt_notificaciones').select('tipo, referencia_id').eq('usuario_id', uid)
     .in('tipo', ['tarea_vence_hoy', 'tarea_vence_3dias', 'tarea_vencida']).in('referencia_id', mias.map(t => t.id))
   const ya = new Set((prev || []).map((p: any) => `${p.tipo}:${p.referencia_id}`))
   for (const t of mias) {
     let tipo = '', titulo = ''
+    if (!t.deadline) continue
     if (t.deadline < hoy) { tipo = 'tarea_vencida'; titulo = 'Tarea vencida' }
     else if (t.deadline === hoy) { tipo = 'tarea_vence_hoy'; titulo = 'Vence hoy' }
     else if (t.deadline <= en3) { tipo = 'tarea_vence_3dias'; titulo = 'Vence en pocos días' }
@@ -281,7 +284,7 @@ export function proximaFecha(deadline: string, recurrencia: string, anclaISO?: s
 
 /** Al cerrar una tarea recurrente, crea la siguiente (una sola vez). */
 export async function generarSiguienteRecurrente(tarea: Tarea, actor: Usuario) {
-  if (!tarea.recurrencia || tarea.siguiente_generada) return
+  if (!tarea.recurrencia || tarea.siguiente_generada || !tarea.deadline) return // sin fecha no hay próxima fecha
   const { data: marca } = await supabase.from('mkt_tareas').update({ siguiente_generada: true }).eq('id', tarea.id).eq('siguiente_generada', false).select('id')
   if (!marca || marca.length === 0) return // otra persona ya la generó
   let ancla = tarea.deadline

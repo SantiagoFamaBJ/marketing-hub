@@ -36,7 +36,7 @@ export default function PasanteSeguimiento({ usuario, permisos }: { usuario: Usu
   const statsDe = (u: Pas) => {
     const mias = tareas.filter(t => t.responsable_id === u.id || t.asignados.some(a => a.id === u.id))
     const fin = mias.filter(t => t.finalizada_en)
-    const ok = fin.filter(t => dia(t.finalizada_en!) <= t.deadline).length
+    const ok = fin.filter(t => (!t.deadline || dia(t.finalizada_en!) <= t.deadline)).length
     return { mias, fin, abiertas: mias.filter(t => !estaCerrada(t.estado)), vencidas: mias.filter(vencida).length, ok, pct: fin.length ? Math.round((ok / fin.length) * 100) : null }
   }
 

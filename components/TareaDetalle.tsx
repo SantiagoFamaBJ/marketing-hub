@@ -172,7 +172,7 @@ export default function TareaDetalle({ tarea, usuario, usuarios, permisos, campa
                 {tarea.etiquetas.map(e => <span key={e.id} style={{ fontSize: '0.65rem', fontWeight: 600, backgroundColor: e.color + '22', color: e.color, padding: '2px 8px', borderRadius: 4 }}>{e.nombre}</span>)}
               </div>
               <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)', marginBottom: 4, wordBreak: 'break-word' }}>{tarea.titulo}</h2>
-              <p style={{ fontSize: '0.75rem', color: vencida(tarea) ? '#ef4444' : 'var(--text-muted)' }}>📅 Vence {fechaLarga(tarea.deadline)}{vencida(tarea) && ' · Vencida'}{campanaNombre && ` · 📣 ${campanaNombre}`}</p>
+              <p style={{ fontSize: '0.75rem', color: vencida(tarea) ? '#ef4444' : 'var(--text-muted)' }}>📅 {tarea.deadline ? `Vence ${fechaLarga(tarea.deadline)}` : 'Sin fecha de entrega'}{vencida(tarea) && ' · Vencida'}{campanaNombre && ` · 📣 ${campanaNombre}`}</p>
             </div>
             <button onClick={onClose} aria-label="Cerrar" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5rem', color: 'var(--text-muted)', alignSelf: 'flex-start' }}>×</button>
           </div>

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useSesion } from '@/lib/useSesion'
-import { Tarea, Usuario, Etiqueta, cargarTareas, cargarUsuarios, estaCerrada, estadoInfo, prioridadInfo, fechaCorta, vencida } from '@/lib/tareas'
+import { Tarea, Usuario, Etiqueta, cargarTareas, cargarUsuarios, estaCerrada, estadoInfo, prioridadInfo, fechaCorta, vencida, porFecha } from '@/lib/tareas'
 import TareaDetalle from '@/components/TareaDetalle'
 import TareaForm from '@/components/TareaForm'
 
@@ -216,7 +216,7 @@ export default function CampanasPage() {
                   </div>
                   <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 8 }}>Son las mismas tareas de la sección Tareas: lo que cambies acá se ve allá y al revés.</p>
                   {tareasDe(abierta.id).length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', padding: 12 }}>Todavía no hay tareas vinculadas. Creá una nueva o asociá una existente.</p>}
-                  {tareasDe(abierta.id).sort((a, b) => a.deadline.localeCompare(b.deadline)).map(t => {
+                  {tareasDe(abierta.id).sort((a, b) => porFecha(a, b)).map(t => {
                     const e = estadoInfo(t.estado), p = prioridadInfo(t.prioridad)
                     return (
                       <div key={t.id} onClick={() => setDetalleId(t.id)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.55rem 0.7rem', border: '1.5px solid var(--border)', borderLeft: `3px solid ${p.color}`, borderRadius: 8, marginBottom: 6, cursor: 'pointer', flexWrap: 'wrap' }}>

@@ -6,8 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { useSesion } from '@/lib/useSesion'
 import {
   Tarea, Usuario, cargarTareas, cargarUsuarios, estaCerrada, prioridadInfo, estadoInfo, vencida, fechaCorta, hoyISO, sumarDias,
-  generarAvisosVencimiento, esMia,
-} from '@/lib/tareas'
+  generarAvisosVencimiento, esMia, porFecha } from '@/lib/tareas'
 import TareaDetalle from '@/components/TareaDetalle'
 
 const LIMITE_CARGA = 8 // tareas abiertas por persona a partir de las cuales se avisa de sobrecarga
@@ -59,8 +58,8 @@ export default function DashboardPage() {
     return {
       pendientes: abiertas.filter(t => t.estado === 'pendiente').length,
       proceso: abiertas.filter(t => t.estado === 'en_proceso' || t.estado === 'correcciones').length,
-      vencidas: abiertas.filter(t => t.deadline < hoy).length,
-      pronto: abiertas.filter(t => t.deadline >= hoy && t.deadline <= en3).length,
+      vencidas: abiertas.filter(t => !!t.deadline && t.deadline < hoy).length,
+      pronto: abiertas.filter(t => !!t.deadline && t.deadline >= hoy && t.deadline <= en3).length,
       revision: base.filter(t => t.estado === 'para_revision').length,
       finalizadas: base.filter(t => estaCerrada(t.estado) && (t.finalizada_en || t.actualizado_en || '').slice(0, 10) >= desde).length,
       abiertas,
@@ -68,15 +67,15 @@ export default function DashboardPage() {
   }, [base, periodo, hoy, en3])
 
   const prioritarias = k.abiertas
-    .filter(t => t.prioridad === 'urgente' || t.prioridad === 'alta' || t.deadline <= en3)
-    .sort((a, b) => a.deadline.localeCompare(b.deadline) || prioridadInfo(a.prioridad).rank - prioridadInfo(b.prioridad).rank)
+    .filter(t => t.prioridad === 'urgente' || t.prioridad === 'alta' || (!!t.deadline && t.deadline <= en3))
+    .sort((a, b) => porFecha(a, b) || prioridadInfo(a.prioridad).rank - prioridadInfo(b.prioridad).rank)
     .slice(0, 6)
   const pendAprob = tareas.filter(t => t.estado === 'para_revision').sort((a, b) => (a.enviada_revision_en || '').localeCompare(b.enviada_revision_en || ''))
 
   // Carga por persona (equipo)
   const carga = usuarios.map(u => {
     const ab = tareas.filter(t => !estaCerrada(t.estado) && t.asignados.some(a => a.id === u.id))
-    return { u, abiertas: ab.length, vencidas: ab.filter(t => t.deadline < hoy).length, revision: ab.filter(t => t.estado === 'para_revision').length }
+    return { u, abiertas: ab.length, vencidas: ab.filter(t => !!t.deadline && t.deadline < hoy).length, revision: ab.filter(t => t.estado === 'para_revision').length }
   })
 
   // Alertas

@@ -42,15 +42,15 @@ export default function TareaForm({ tarea, usuario, usuarios, etiquetas, campana
   const candidatos = puedeAsignar ? usuarios : usuarios.filter(u => u.id === usuario.id)
 
   async function guardar() {
-    if (!f.titulo.trim() || !f.deadline || guardando) return
+    if (!f.titulo.trim() || guardando) return
     setGuardando(true)
     const resp = puedeAsignar ? f.responsable_id : usuario.id
     const colabs = puedeAsignar ? f.colaboradores.filter(id => id !== resp) : []
     const todos = [resp, ...colabs]
     const payload = {
       titulo: f.titulo.trim(), descripcion: f.descripcion && f.descripcion !== '<p></p>' ? f.descripcion : null,
-      prioridad: f.prioridad, deadline: f.deadline, categoria: f.categoria || null,
-      campana_id: f.campana_id || null, responsable_id: resp, requiere_aprobacion: f.requiere_aprobacion, recurrencia: f.recurrencia || null,
+      prioridad: f.prioridad, deadline: f.deadline || null, categoria: f.categoria || null,
+      campana_id: f.campana_id || null, responsable_id: resp, requiere_aprobacion: f.requiere_aprobacion, recurrencia: f.deadline ? (f.recurrencia || null) : null,
       actualizado_en: new Date().toISOString(),
     }
     let id = tarea?.id
@@ -98,7 +98,10 @@ export default function TareaForm({ tarea, usuario, usuarios, etiquetas, campana
               {Object.entries(PRIORIDADES).sort((a, b) => b[1].rank - a[1].rank).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>
           </Campo>
-          <Campo label="Vence *"><input type="date" value={f.deadline} onChange={e => set('deadline', e.target.value)} style={inp} /></Campo>
+          <Campo label="Vence (opcional)">
+            <input type="date" value={f.deadline} onChange={e => set('deadline', e.target.value)} style={inp} />
+            {f.deadline ? <button type="button" onClick={() => { set('deadline', ''); set('recurrencia', '') }} style={{ marginTop: 4, background: 'none', border: 'none', padding: 0, color: '#f15922', fontSize: '0.75rem', cursor: 'pointer' }}>Quitar fecha</button> : <span style={{ display: 'block', marginTop: 4, fontSize: '0.72rem', color: 'var(--text-muted)' }}>Sin fecha de entrega</span>}
+          </Campo>
           <Campo label="Categoría / área">
             <select value={f.categoria} onChange={e => set('categoria', e.target.value)} style={inp}>
               <option value="">Sin categoría</option>
@@ -106,7 +109,7 @@ export default function TareaForm({ tarea, usuario, usuarios, etiquetas, campana
             </select>
           </Campo>
           <Campo label="Repetir">
-            <select value={f.recurrencia} onChange={e => set('recurrencia', e.target.value)} style={inp}>
+            <select value={f.deadline ? f.recurrencia : ''} disabled={!f.deadline} title={f.deadline ? '' : 'Para repetir hay que poner una fecha'} onChange={e => set('recurrencia', e.target.value)} style={{ ...inp, opacity: f.deadline ? 1 : 0.6 }}>
               <option value="">No se repite</option>
               <option value="semanal">🔁 Cada semana</option>
               <option value="mensual">🔁 Cada mes</option>
@@ -171,7 +174,7 @@ export default function TareaForm({ tarea, usuario, usuarios, etiquetas, campana
 
         <div className="modal-actions" style={{ display: 'flex', gap: 10 }}>
           <button onClick={onClose} style={{ flex: 1, padding: '0.65rem', border: '1.5px solid var(--border)', borderRadius: 8, backgroundColor: 'var(--bg-card)', cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text)' }}>Cancelar</button>
-          <button onClick={guardar} disabled={!f.titulo.trim() || !f.deadline || guardando} style={{ flex: 2, padding: '0.65rem', border: 'none', borderRadius: 8, backgroundColor: '#f15922', color: '#fff', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600, opacity: !f.titulo.trim() || !f.deadline || guardando ? 0.6 : 1 }}>
+          <button onClick={guardar} disabled={!f.titulo.trim() || guardando} style={{ flex: 2, padding: '0.65rem', border: 'none', borderRadius: 8, backgroundColor: '#f15922', color: '#fff', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600, opacity: !f.titulo.trim() || guardando ? 0.6 : 1 }}>
             {guardando ? 'Guardando...' : tarea ? 'Guardar cambios' : 'Crear tarea'}
           </button>
         </div>

@@ -5,8 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useSesion } from '@/lib/useSesion'
 import {
   Tarea, Usuario, Etiqueta, ESTADOS, PRIORIDADES, CATEGORIAS, estadoInfo, prioridadInfo, estaCerrada, vencida,
-  cargarTareas, cargarUsuarios, esMia, fechaCorta, hoyISO, sumarDias, isoLocal, aplicarAccion,
-} from '@/lib/tareas'
+  cargarTareas, cargarUsuarios, esMia, fechaCorta, hoyISO, sumarDias, isoLocal, aplicarAccion, porFecha } from '@/lib/tareas'
 import TareaDetalle from '@/components/TareaDetalle'
 import TareaForm from '@/components/TareaForm'
 import { VistaPersona, VistaAprobaciones, VistaSemana } from '@/components/VistasEquipo'
@@ -66,9 +65,9 @@ export default function TareasPage() {
       if (f.categoria && t.categoria !== f.categoria) return false
       if (f.campana && t.campana_id !== f.campana) return false
       if (f.etiqueta && !t.etiquetas.some(e => e.id === f.etiqueta)) return false
-      if (f.desde && t.deadline < f.desde) return false
-      if (f.hasta && t.deadline > f.hasta) return false
-      if (!f.antiguas && estaCerrada(t.estado) && !f.estado && (t.finalizada_en || t.actualizado_en || t.deadline).slice(0, 10) < limiteAntiguas) return false
+      if (f.desde && (!t.deadline || t.deadline < f.desde)) return false
+      if (f.hasta && (!t.deadline || t.deadline > f.hasta)) return false
+      if (!f.antiguas && estaCerrada(t.estado) && !f.estado && (t.finalizada_en || t.actualizado_en || t.deadline || '').slice(0, 10) < limiteAntiguas) return false
       return true
     })
   }, [tareas, f, usuario])
@@ -157,7 +156,7 @@ export default function TareasPage() {
         <style>{`.kanban-hint{display:none}.kanban-col{flex:0 0 270px}@media(max-width:600px){.kanban-hint{display:block}.kanban-col{flex:0 0 78vw}}`}</style>
         <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.75rem', scrollSnapType: 'x proximity', alignItems: 'flex-start' }}>
           {ESTADOS.map(col => {
-            const items = filtradas.filter(t => t.estado === col.key).sort((a, b) => prioridadInfo(a.prioridad).rank - prioridadInfo(b.prioridad).rank || a.deadline.localeCompare(b.deadline))
+            const items = filtradas.filter(t => t.estado === col.key).sort((a, b) => prioridadInfo(a.prioridad).rank - prioridadInfo(b.prioridad).rank || porFecha(a, b))
             return (
               <div key={col.key} className="kanban-col" style={{ scrollSnapAlign: 'start', backgroundColor: 'var(--bg-card)', borderRadius: 12, padding: '0.75rem', border: '1.5px solid var(--border)', minHeight: 120 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
@@ -236,7 +235,7 @@ export default function TareasPage() {
 function Card({ t, campana, puedeEditar, onOpen, onMover }: { t: Tarea; campana?: { nombre: string; color?: string }; puedeEditar: boolean; onOpen: () => void; onMover: (t: Tarea, e: string) => void }) {
   const p = prioridadInfo(t.prioridad)
   const venc = vencida(t)
-  const proxima = !estaCerrada(t.estado) && t.deadline >= hoyISO() && t.deadline <= sumarDias(3)
+  const proxima = !estaCerrada(t.estado) && !!t.deadline && t.deadline >= hoyISO() && t.deadline <= sumarDias(3)
   return (
     <div onClick={onOpen} style={{ backgroundColor: 'var(--bg-card)', border: `1.5px solid ${venc ? '#fecaca' : 'var(--border)'}`, borderLeft: `4px solid ${p.color}`, borderRadius: 10, padding: '0.7rem', cursor: 'pointer' }}>
       <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -278,7 +277,7 @@ function CalendarioTareas({ tareas, mes, setMes, diaSel, setDiaSel, onOpen }: { 
   const celdas: (string | null)[] = [...Array(offset).fill(null), ...Array.from({ length: diasMes }, (_, i) => isoLocal(new Date(mes.getFullYear(), mes.getMonth(), i + 1)))]
   while (celdas.length % 7) celdas.push(null)
   const porDia: Record<string, Tarea[]> = {}
-  tareas.forEach(t => { (porDia[t.deadline] ||= []).push(t) })
+  tareas.forEach(t => { if (t.deadline) (porDia[t.deadline] ||= []).push(t) })
   const hoy = hoyISO()
   const delDia = (porDia[diaSel] || []).sort((a, b) => prioridadInfo(a.prioridad).rank - prioridadInfo(b.prioridad).rank)
 

@@ -33,7 +33,7 @@ export default function ReportesAnalisis() {
   const cerradas = tareas.filter(t => t.finalizada_en)
   const hace90 = sumarDias(-90)
   const recientes = cerradas.filter(t => dia(t.finalizada_en!) >= hace90)
-  const aTiempo = (t: Tarea) => dia(t.finalizada_en!) <= t.deadline
+  const aTiempo = (t: Tarea) => !t.deadline || dia(t.finalizada_en!) <= t.deadline
   const nombre = (id: string | null) => usuarios.find(u => u.id === id)?.nombre.split(' ')[0] || 'Sin asignar'
 
   const bloqueadas = abiertas.filter(t => t.estado === 'bloqueada')
@@ -49,7 +49,7 @@ export default function ReportesAnalisis() {
       {items.map(t => (
         <div key={t.id} style={{ display: 'flex', gap: 8, padding: '0.4rem 0', borderTop: '1px solid var(--border)', fontSize: '0.82rem', flexWrap: 'wrap' }}>
           <span style={{ flex: '1 1 160px', color: 'var(--text)', fontWeight: 600 }}>{t.titulo}</span>
-          <span style={{ color: 'var(--text-muted)' }}>{nombre(t.responsable_id)} · vence {fechaCorta(t.deadline)}{extra ? ` · ${extra(t)}` : ''}</span>
+          <span style={{ color: 'var(--text-muted)' }}>{nombre(t.responsable_id)} · {t.deadline ? `vence ${fechaCorta(t.deadline)}` : 'sin fecha'}{extra ? ` · ${extra(t)}` : ''}</span>
         </div>
       ))}
     </div>

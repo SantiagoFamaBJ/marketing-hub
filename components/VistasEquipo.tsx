@@ -4,8 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import {
   Tarea, Usuario, Permisos, estaCerrada, estadoInfo, prioridadInfo, vencida, fechaCorta, hoyISO, isoLocal, sumarDias,
-  reasignarTarea, reprogramarTarea,
-} from '@/lib/tareas'
+  reasignarTarea, reprogramarTarea, porFecha } from '@/lib/tareas'
 
 const LIMITE_CARGA = 8
 const LIMITE_DIA = 4
@@ -31,7 +30,7 @@ export function VistaPersona({ tareas, usuarios, usuario, permisos, onOpen, onCh
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, alignItems: 'start' }}>
       {columnas.map(({ u, items }) => {
-        const venc = items.filter(t => t.deadline < hoy).length
+        const venc = items.filter(t => !!t.deadline && t.deadline < hoy).length
         const rev = items.filter(t => t.estado === 'para_revision').length
         const colab = u ? abiertas.filter(t => t.responsable_id !== u.id && t.asignados.some(a => a.id === u.id)).length : 0
         const total = items.length + colab
@@ -49,7 +48,7 @@ export function VistaPersona({ tareas, usuarios, usuario, permisos, onOpen, onCh
             </div>
             {total > LIMITE_CARGA && <p style={{ fontSize: '0.7rem', color: '#ef4444', marginBottom: 6 }}>⚠️ Posible sobrecarga: considerá reasignar.</p>}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
-              {items.sort((a, b) => a.deadline.localeCompare(b.deadline)).map(t => {
+              {items.sort(porFecha).map(t => {
                 const p = prioridadInfo(t.prioridad), e = estadoInfo(t.estado)
                 return (
                   <div key={t.id} style={{ border: `1px solid ${vencida(t) ? '#fecaca' : 'var(--border)'}`, borderLeft: `3px solid ${p.color}`, borderRadius: 8, padding: '0.5rem 0.6rem' }}>
@@ -101,7 +100,7 @@ export function VistaAprobaciones({ tareas, permisos, onOpen }: Props) {
           <div style={{ flex: '1 1 200px', minWidth: 0 }}>
             <p style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text)' }}>{t.titulo}</p>
             <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-              {t.responsable?.nombre || 'Sin responsable'} · vence {fechaCorta(t.deadline)}
+              {t.responsable?.nombre || 'Sin responsable'} · {t.deadline ? `vence ${fechaCorta(t.deadline)}` : 'sin fecha'}
               {t.estado === 'para_revision' && <> · esperando hace {dias(t) === 0 ? 'menos de 1 día' : `${dias(t)} día${dias(t) > 1 ? 's' : ''}`}{dias(t) >= 2 && <span style={{ color: '#ef4444' }}> ⚠️</span>}</>}
             </p>
           </div>
@@ -150,13 +149,13 @@ export function VistaSemana({ tareas, usuarios, usuario, permisos, onOpen, onCha
   const dias = Array.from({ length: 7 }, (_, i) => { const d = new Date(lunes); d.setDate(lunes.getDate() + i); return isoLocal(d) })
   const inicio = dias[0], fin = dias[6]
   const abiertas = tareas.filter(t => !estaCerrada(t.estado))
-  const atrasadas = abiertas.filter(t => t.deadline < inicio && t.deadline < hoy).sort((a, b) => a.deadline.localeCompare(b.deadline))
+  const atrasadas = abiertas.filter(t => !!t.deadline && t.deadline < inicio && t.deadline < hoy).sort(porFecha)
   const puedeMover = (t: Tarea) => t.asignados.some(a => a.id === usuario.id) || t.creado_por === usuario.id || !!permisos.aprobar_tareas
 
-  const cargaPersona = usuarios.map(u => ({ u, n: abiertas.filter(t => t.deadline >= inicio && t.deadline <= fin && t.responsable_id === u.id).length })).filter(x => x.n > 0)
+  const cargaPersona = usuarios.map(u => ({ u, n: abiertas.filter(t => !!t.deadline && t.deadline >= inicio && t.deadline <= fin && t.responsable_id === u.id).length })).filter(x => x.n > 0)
 
   async function mover(t: Tarea, dias: number) {
-    await reprogramarTarea(t, sumarDias(dias, new Date(t.deadline + 'T12:00:00')), usuario); onChanged()
+    await reprogramarTarea(t, sumarDias(dias, t.deadline ? new Date(t.deadline + 'T12:00:00') : new Date()), usuario); onChanged()
   }
   async function aHoy(t: Tarea) { await reprogramarTarea(t, hoy, usuario); onChanged() }
 

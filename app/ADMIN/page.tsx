@@ -11,7 +11,7 @@ type Usuario = { id: string; nombre: string; slug: string; avatar_color: string;
 type Plantilla = { id: string; nombre: string; categoria: string; contenido: string; variables: any[]; activa: boolean }
 type Etiqueta = { id: string; nombre: string; color: string; es_predeterminada: boolean }
 type Manual = { id: string; titulo: string; descripcion: string | null; categoria: string; tipo: string; url: string | null; nombre_archivo: string | null; activo: boolean }
-type Tarea = { id: string; titulo: string; estado: string; prioridad: string; deadline: string; creado_por: string; asignados: Usuario[] }
+type Tarea = { id: string; titulo: string; estado: string; prioridad: string; deadline: string | null; creado_por: string; asignados: Usuario[] }
 
 const EMOJIS = ['😊','🧡','⭐','🌟','💪','🎯','🚀','🌸','🦋','🎨','📱','💡','🔥','✨','🌈','👑','🎤','📸']
 const COLORES_AVATAR = ['#f15922','#3B82F6','#8B5CF6','#10B981','#F59E0B','#EC4899','#06B6D4','#84CC16','#F97316','#6366F1']
@@ -380,7 +380,7 @@ function AdminInner() {
                 <div style={{ flex: 1, minWidth: 120 }}>
                   <p style={{ fontWeight: 600, color: '#1a1a1a', fontSize: '0.875rem' }}>{t.titulo}</p>
                   <div style={{ display: 'flex', gap: '0.5rem', marginTop: '2px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '0.7rem', color: '#888' }}>📅 {new Date(t.deadline + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}</span>
+                    <span style={{ fontSize: '0.7rem', color: '#888' }}>📅 {t.deadline ? new Date(t.deadline + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }) : 'Sin fecha'}</span>
                     <span style={{ fontSize: '0.7rem', color: '#888', backgroundColor: '#f4f4f4', padding: '2px 6px', borderRadius: '4px' }}>{estadoInfo(t.estado).label}</span>
                     {t.asignados.map(a => <span key={a.id} style={{ fontSize: '0.7rem', backgroundColor: a.avatar_color + '22', color: a.avatar_color, padding: '2px 6px', borderRadius: '99px', fontWeight: 600 }}>{a.nombre.split(' ')[0]}</span>)}
                   </div>
