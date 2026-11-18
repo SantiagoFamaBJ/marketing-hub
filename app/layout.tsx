@@ -2,8 +2,11 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://mkthub.dentalmedrano.com'),
   title: 'Marketing Hub — Dental Medrano',
   description: 'Plataforma interna del equipo de marketing',
+  openGraph: { title: 'Marketing Hub — Dental Medrano', description: 'Plataforma interna del equipo de marketing', siteName: 'Dental Medrano', type: 'website', locale: 'es_AR', images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'Dental Medrano' }] },
+  twitter: { card: 'summary_large_image', images: ['/og-image.png'] },
   robots: { index: false, follow: false, nocache: true, googleBot: { index: false, follow: false } },
   icons: {
     icon: [
