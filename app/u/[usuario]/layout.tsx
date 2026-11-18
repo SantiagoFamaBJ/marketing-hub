@@ -5,6 +5,7 @@ import { useRouter, usePathname, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { credencial, claveValida } from '@/lib/pin'
+import { useModulos, moduloActivo, MODULOS } from '@/lib/modulos'
 import { cargarPermisos, Permisos, rolCorto, NOTIF_TIPOS, estadoInfo } from '@/lib/tareas'
 
 type Usuario = { id: string; nombre: string; slug: string; avatar_color: string; avatar_emoji: string; rol: string }
@@ -15,6 +16,8 @@ const navItems = [
   { href: '', label: 'Dashboard', emoji: '🏠' },
   { href: '/tareas', label: 'Tareas', emoji: '✅' },
   { href: '/campanas', label: 'Campañas', emoji: '📣' },
+  { href: '/email', label: 'Email marketing', emoji: '✉️' },
+  { href: '/merchandising', label: 'Merchandising', emoji: '🎁' },
   { href: '/objetivos', label: 'Objetivos', emoji: '🎯' },
   { href: '/responsabilidades', label: 'Responsabilidades', emoji: '🧭' },
   { href: '/copys', label: 'Copys', emoji: '✍️' },
@@ -26,6 +29,7 @@ const navItems = [
 const reporteItems = [{ href: '/reportes', label: 'Reportes', emoji: '📊' }]
 
 export default function UsuarioLayout({ children }: { children: React.ReactNode }) {
+  const modulos = useModulos()
   const [usuario, setUsuario] = useState<Usuario | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [darkMode, setDarkMode] = useState(false)
@@ -140,7 +144,12 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
   if (!usuario) return null
 
   const base = `/u/${usuario.slug}`
-  const navVisibles = navItems.filter(i => i.href !== '/campanas' || !permisos || permisos.gestionar_campanas)
+  const claveDe = (href: string) => MODULOS.find(m => m.ruta === href)?.clave
+  const navVisibles = navItems
+    .filter(i => i.href !== '/campanas' || !permisos || permisos.gestionar_campanas)
+    .filter(i => { const k = claveDe(i.href); return !k || moduloActivo(modulos, k) })
+  const seccionActual = MODULOS.find(m => pathname === `${base}${m.ruta}` || pathname.startsWith(`${base}${m.ruta}/`))
+  const seccionApagada = !!seccionActual && !moduloActivo(modulos, seccionActual.clave)
   const veReportes = !!permisos?.ver_reportes
   const isActive = (href: string) => pathname === (href === '' ? base : `${base}${href}`)
 
@@ -307,7 +316,13 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
         </div>
 
         <div style={{ padding: '2rem', flex: 1 }} className="page-content">
-          {children}
+          {seccionApagada ? (
+            <div style={{ maxWidth: 480, margin: '4rem auto', textAlign: 'center', color: c.textMuted }}>
+              <p style={{ fontSize: '2rem', marginBottom: 8 }}>{seccionActual?.emoji}</p>
+              <p style={{ fontWeight: 700, color: c.text, marginBottom: 4 }}>{seccionActual?.label} está desactivada por ahora</p>
+              <p style={{ fontSize: '0.85rem' }}>Se vuelve a activar desde Administración.</p>
+            </div>
+          ) : children}
         </div>
       </main>
 

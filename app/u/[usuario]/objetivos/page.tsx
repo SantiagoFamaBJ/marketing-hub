@@ -20,7 +20,7 @@ function Barra({ valor }: { valor: number }) {
 }
 
 export default function ObjetivosPage() {
-  const { usuario } = useSesion()
+  const { usuario, permisos } = useSesion()
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [objetivos, setObjetivos] = useState<Objetivo[]>([])
   const [cargando, setCargando] = useState(true)
@@ -68,6 +68,8 @@ export default function ObjetivosPage() {
   }
 
   if (!usuario) return null
+  // Cada persona edita solo sus objetivos; el coordinador, todos (lo exige también la base de datos)
+  const puedeEditar = (uid: string) => !!permisos?.es_coord || usuario.id === uid
 
   const total = objetivos.length
   const logrados = objetivos.filter(o => o.progreso >= 100).length
@@ -78,7 +80,7 @@ export default function ObjetivosPage() {
       <div style={{ marginBottom: '1.25rem' }}>
         <h1 style={{ fontSize: 'clamp(1.25rem, 4vw, 1.6rem)', fontWeight: 700, color: 'var(--text)' }}>🎯 Objetivos</h1>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 2 }}>
-          {cargando ? 'Cargando…' : total === 0 ? 'Todavía no hay objetivos cargados.' : `${total} objetivo${total === 1 ? '' : 's'} · ${logrados} cumplido${logrados === 1 ? '' : 's'}`}
+          {cargando ? 'Cargando…' : total === 0 ? 'Todavía no hay objetivos cargados.' : `${total} objetivo${total === 1 ? '' : 's'} · ${logrados} cumplido${logrados === 1 ? '' : 's'}`}{permisos?.es_coord ? '' : ' · Cada uno carga y edita los suyos.'}
         </p>
       </div>
 
@@ -94,7 +96,7 @@ export default function ObjetivosPage() {
                   <p style={{ fontWeight: 700, color: 'var(--text)' }}>{u.nombre}</p>
                   <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{mios.length ? `${mios.length} objetivo${mios.length === 1 ? '' : 's'} · promedio ${prom}%` : 'Sin objetivos'}</p>
                 </div>
-                <button onClick={() => abrir({ nuevo: true, usuario_id: u.id })} style={{ ...btnMini, padding: '0 12px', color: '#f15922', borderColor: '#f15922' }}>+ Objetivo</button>
+                {puedeEditar(u.id) && <button onClick={() => abrir({ nuevo: true, usuario_id: u.id })} style={{ ...btnMini, padding: '0 12px', color: '#f15922', borderColor: '#f15922' }}>+ Objetivo</button>}
               </div>
 
               {mios.length > 0 && <div style={{ marginBottom: 12 }}><Barra valor={prom} /></div>}
@@ -111,7 +113,7 @@ export default function ObjetivosPage() {
                           <p style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text)', textDecoration: hecho ? 'line-through' : 'none', opacity: hecho ? 0.7 : 1, overflowWrap: 'anywhere' }}>{hecho && '✅ '}{o.titulo}</p>
                           {o.descripcion && <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2, overflowWrap: 'anywhere' }}>{o.descripcion}</p>}
                         </div>
-                        <button onClick={() => abrir(o)} aria-label={`Editar ${o.titulo}`} style={btnMini}>✏️</button>
+                        {puedeEditar(o.usuario_id) && <button onClick={() => abrir(o)} aria-label={`Editar ${o.titulo}`} style={btnMini}>✏️</button>}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
                         <div style={{ flex: 1 }}><Barra valor={o.progreso} /></div>
@@ -119,10 +121,10 @@ export default function ObjetivosPage() {
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '0.72rem', color: d !== null && d < 0 && !hecho ? '#ef4444' : 'var(--text-muted)' }}>📅 {vence}</span>
-                        <span style={{ display: 'flex', gap: 4 }}>
+                        {puedeEditar(o.usuario_id) && <span style={{ display: 'flex', gap: 4 }}>
                           <button onClick={() => ajustar(o, -10)} aria-label="Bajar 10%" style={btnMini}>−10</button>
                           <button onClick={() => ajustar(o, 10)} aria-label="Subir 10%" style={btnMini}>+10</button>
-                        </span>
+                        </span>}
                       </div>
                     </div>
                   )

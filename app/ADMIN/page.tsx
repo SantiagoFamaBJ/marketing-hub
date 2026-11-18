@@ -1,6 +1,7 @@
 'use client'
 
 import ReportesAdmin from '@/components/ReportesAdmin'
+import { AdminResponsabilidades, AdminSecciones } from '@/components/AdminEquipo'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -32,7 +33,7 @@ function Campo({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-type Tab = 'usuarios' | 'reportes' | 'plantillas' | 'etiquetas' | 'manuales' | 'tareas'
+type Tab = 'usuarios' | 'reportes' | 'plantillas' | 'etiquetas' | 'manuales' | 'tareas' | 'responsabilidades' | 'secciones'
 
 export default function AdminPage() {
   const [ok, setOk] = useState<null | boolean>(null)
@@ -237,6 +238,8 @@ function AdminInner() {
     { key: 'etiquetas', label: 'Etiquetas', emoji: '🏷️' },
     { key: 'manuales', label: 'Manuales', emoji: '📚' },
     { key: 'tareas', label: 'Tareas', emoji: '✅' },
+    { key: 'responsabilidades', label: 'Responsabilidades', emoji: '🧭' },
+    { key: 'secciones', label: 'Secciones', emoji: '🧩' },
   ]
 
   return (
@@ -295,6 +298,8 @@ function AdminInner() {
 
         {/* ===== PERMISOS ===== */}
         {tab === 'reportes' && <ReportesAdmin />}
+        {tab === 'responsabilidades' && <AdminResponsabilidades />}
+        {tab === 'secciones' && <AdminSecciones />}
 
         {tab === 'plantillas' && (
           <>
@@ -376,7 +381,7 @@ function AdminInner() {
             {tareas.length === 0 && <p style={{ textAlign: 'center', color: '#888', padding: '2rem' }}>No hay tareas.</p>}
             {tareas.map(t => (
               <div key={t.id} style={{ backgroundColor: '#fff', border: '1.5px solid #e8e8e8', borderRadius: '10px', padding: '0.875rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: PRIORIDAD_COLOR[t.prioridad], flexShrink: 0 }} />
+                <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: (PRIORIDAD_COLOR[t.prioridad || ''] || '#9ca3af'), flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 120 }}>
                   <p style={{ fontWeight: 600, color: '#1a1a1a', fontSize: '0.875rem' }}>{t.titulo}</p>
                   <div style={{ display: 'flex', gap: '0.5rem', marginTop: '2px', flexWrap: 'wrap' }}>

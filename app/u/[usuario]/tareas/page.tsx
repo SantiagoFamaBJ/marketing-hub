@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useSesion } from '@/lib/useSesion'
 import {
-  Tarea, Usuario, Etiqueta, ESTADOS, PRIORIDADES, CATEGORIAS, estadoInfo, prioridadInfo, estaCerrada, vencida,
+  Tarea, Usuario, Etiqueta, ESTADOS, PRIORIDADES, CATEGORIAS, estadoInfo, prioridadInfo, estaCerrada, vencida, esParte,
   cargarTareas, cargarUsuarios, esMia, fechaCorta, hoyISO, sumarDias, isoLocal, aplicarAccion, porFecha } from '@/lib/tareas'
 import TareaDetalle from '@/components/TareaDetalle'
 import TareaForm from '@/components/TareaForm'
@@ -84,7 +84,7 @@ export default function TareasPage() {
   }
 
   if (!usuario || !permisos) return null
-  const puedeEditar = (t: Tarea) => esMia(t, usuario.id) || !!permisos.aprobar_tareas
+  const puedeEditar = (t: Tarea) => esParte(t, usuario.id) || !!permisos.aprobar_tareas
   const aprobarPend = tareas.filter(t => t.estado === 'para_revision').length
 
   return (
@@ -185,7 +185,7 @@ export default function TareasPage() {
             const p = prioridadInfo(t.prioridad), e = estadoInfo(t.estado)
             return (
               <div key={t.id} role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetalleId(t.id) } }} onClick={() => setDetalleId(t.id)} style={{ backgroundColor: 'var(--bg-card)', border: `1.5px solid ${vencida(t) ? '#fecaca' : 'var(--border)'}`, borderRadius: 10, padding: '0.7rem 0.9rem', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.68rem', fontWeight: 700, backgroundColor: p.bg, color: p.color, padding: '3px 9px', borderRadius: 99 }}>{p.label}</span>
+                {t.prioridad && <span style={{ fontSize: '0.68rem', fontWeight: 700, backgroundColor: p.bg, color: p.color, padding: '3px 9px', borderRadius: 99 }}>{p.label}</span>}
                 <p style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text)', flex: '1 1 160px', minWidth: 0 }}>{t.titulo}</p>
                 <span style={{ fontSize: '0.68rem', fontWeight: 700, backgroundColor: e.bg, color: e.color, padding: '3px 9px', borderRadius: 99 }}>{e.label}</span>
                 {campanaNombre(t.campana_id) && <span style={{ fontSize: '0.68rem', fontWeight: 600, color: campanas.find(c => c.id === t.campana_id)?.color || '#f15922' }}>📣 {campanaNombre(t.campana_id)}</span>}
@@ -239,7 +239,7 @@ function Card({ t, campana, puedeEditar, onOpen, onMover }: { t: Tarea; campana?
   return (
     <div onClick={onOpen} style={{ backgroundColor: 'var(--bg-card)', border: `1.5px solid ${venc ? '#fecaca' : 'var(--border)'}`, borderLeft: `4px solid ${p.color}`, borderRadius: 10, padding: '0.7rem', cursor: 'pointer' }}>
       <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-        <span style={{ fontSize: '0.62rem', fontWeight: 700, backgroundColor: p.bg, color: p.color, padding: '2px 8px', borderRadius: 99 }}>{p.label}</span>
+        {t.prioridad && <span style={{ fontSize: '0.62rem', fontWeight: 700, backgroundColor: p.bg, color: p.color, padding: '2px 8px', borderRadius: 99 }}>{p.label}</span>}
         {t.requiere_aprobacion && <span title="Requiere aprobación" style={{ fontSize: '0.7rem' }}>🔒</span>}
         {t.categoria && <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>{t.categoria}</span>}
       </div>
@@ -253,9 +253,9 @@ function Card({ t, campana, puedeEditar, onOpen, onMover }: { t: Tarea; campana?
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between', flexWrap: 'wrap' }}>
         <span style={{ fontSize: '0.7rem', color: venc ? '#ef4444' : proxima ? '#f59e0b' : 'var(--text-muted)' }}>📅 {fechaCorta(t.deadline)}{venc && ' · Vencida'}</span>
         {t.subtareas.total > 0 && <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>☑️ {t.subtareas.hechas}/{t.subtareas.total}</span>}
-        <div style={{ display: 'flex' }}>
-          {t.asignados.slice(0, 4).map((a, i) => (
-            <span key={a.id} title={a.nombre + (a.id === t.responsable_id ? ' (responsable)' : '')} style={{ width: 22, height: 22, borderRadius: '50%', backgroundColor: a.avatar_color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', marginLeft: i ? -6 : 0, border: a.id === t.responsable_id ? '2px solid #f15922' : '2px solid var(--bg-card)' }}>{a.avatar_emoji}</span>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {[...t.asignados].sort((a, b) => (a.id === t.responsable_id ? -1 : 0) - (b.id === t.responsable_id ? -1 : 0)).map(a => (
+            <span key={a.id} title={a.id === t.responsable_id ? 'Responsable' : 'Colaborador'} style={{ fontSize: '0.68rem', backgroundColor: a.avatar_color + '22', color: a.avatar_color, padding: '2px 8px', borderRadius: 99, fontWeight: a.id === t.responsable_id ? 800 : 500, border: `1px solid ${a.avatar_color}${a.id === t.responsable_id ? '' : '55'}` }}>{a.nombre}</span>
           ))}
         </div>
       </div>

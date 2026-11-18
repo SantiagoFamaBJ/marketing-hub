@@ -9,7 +9,7 @@ import TareaForm from '@/components/TareaForm'
 
 type Campana = {
   id: string; nombre: string; descripcion: string | null; color: string; fecha_inicio: string | null; fecha_fin: string | null; estado: string
-  creado_por: string | null; objetivo: string | null; responsable_id: string | null; resultados: string | null
+  creado_por: string | null; objetivo: string | null; responsable_id: string | null; resultados: string | null; canal: 'mayorista' | 'minorista' | null
 }
 type Archivo = { id: string; nombre_archivo: string; url: string; tipo: string | null; creado_en: string }
 
@@ -36,7 +36,8 @@ export default function CampanasPage() {
   const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([])
   const [filtro, setFiltro] = useState<'vigentes' | 'todas'>('vigentes')
   const [editando, setEditando] = useState<Campana | 'nueva' | null>(null)
-  const [form, setForm] = useState({ nombre: '', descripcion: '', objetivo: '', color: '#f15922', fecha_inicio: '', fecha_fin: '', estado: 'activa', responsable_id: '' })
+  const [form, setForm] = useState({ nombre: '', descripcion: '', objetivo: '', color: '#f15922', fecha_inicio: '', fecha_fin: '', estado: 'activa', responsable_id: '', canal: '' })
+  const [canalFiltro, setCanalFiltro] = useState<'todos' | 'mayorista' | 'minorista'>('todos')
   const [abierta, setAbierta] = useState<Campana | null>(null)
   const [tab, setTab] = useState<'resumen' | 'tareas' | 'archivos'>('resumen')
   const [archivos, setArchivos] = useState<Archivo[]>([])
@@ -67,15 +68,15 @@ export default function CampanasPage() {
 
   function abrirForm(c: Campana | 'nueva') {
     setEditando(c)
-    if (c === 'nueva') setForm({ nombre: '', descripcion: '', objetivo: '', color: '#f15922', fecha_inicio: '', fecha_fin: '', estado: 'activa', responsable_id: usuario?.id || '' })
-    else setForm({ nombre: c.nombre, descripcion: c.descripcion || '', objetivo: c.objetivo || '', color: c.color, fecha_inicio: c.fecha_inicio || '', fecha_fin: c.fecha_fin || '', estado: c.estado, responsable_id: c.responsable_id || '' })
+    if (c === 'nueva') setForm({ nombre: '', descripcion: '', objetivo: '', color: '#f15922', fecha_inicio: '', fecha_fin: '', estado: 'activa', responsable_id: usuario?.id || '', canal: '' })
+    else setForm({ nombre: c.nombre, descripcion: c.descripcion || '', objetivo: c.objetivo || '', color: c.color, fecha_inicio: c.fecha_inicio || '', fecha_fin: c.fecha_fin || '', estado: c.estado, responsable_id: c.responsable_id || '', canal: c.canal || '' })
   }
 
   async function guardar() {
     if (!form.nombre.trim() || !usuario) return
     const payload: any = {
       nombre: form.nombre.trim(), descripcion: form.descripcion || null, objetivo: form.objetivo || null, color: form.color,
-      fecha_inicio: form.fecha_inicio || null, fecha_fin: form.fecha_fin || null, estado: form.estado, responsable_id: form.responsable_id || null,
+      fecha_inicio: form.fecha_inicio || null, fecha_fin: form.fecha_fin || null, estado: form.estado, responsable_id: form.responsable_id || null, canal: form.canal || null,
     }
     if (editando && editando !== 'nueva') await supabase.from('mkt_campanas').update(payload).eq('id', editando.id)
     else await supabase.from('mkt_campanas').insert({ ...payload, creado_por: usuario.id })
@@ -125,7 +126,12 @@ export default function CampanasPage() {
   if (!usuario || !permisos) return null
   if (!permisos.gestionar_campanas) return <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>No tenés acceso a Campañas con tu rol.</p>
 
-  const lista = campanas.filter(c => filtro === 'todas' || ['planificada', 'activa', 'pausada'].includes(c.estado))
+  const lista = campanas.filter(c => (filtro === 'todas' || ['planificada', 'activa', 'pausada'].includes(c.estado)) && (canalFiltro === 'todos' || c.canal === canalFiltro))
+  const GRUPOS: { key: string; label: string; items: Campana[] }[] = [
+    { key: 'mayorista', label: '🏥 Mayoristas', items: lista.filter(c => c.canal === 'mayorista') },
+    { key: 'minorista', label: '🛒 Minoristas', items: lista.filter(c => c.canal === 'minorista') },
+    { key: 'sin', label: 'Sin clasificar', items: lista.filter(c => !c.canal) },
+  ].filter(g => g.items.length > 0)
   const tareasDe = (id: string) => tareas.filter(t => t.campana_id === id)
   const detalle = tareas.find(t => t.id === detalleId) || null
   const campanasSimple = campanas.filter(c => c.estado !== 'archivada').map(c => ({ id: c.id, nombre: c.nombre }))
@@ -137,7 +143,10 @@ export default function CampanasPage() {
           <h1 style={{ fontSize: 'clamp(1.25rem, 4vw, 1.6rem)', fontWeight: 700, color: 'var(--text)' }}>📣 Campañas</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Las tareas de cada campaña son las mismas de Tareas</p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <select value={canalFiltro} onChange={e => setCanalFiltro(e.target.value as any)} aria-label="Público" style={{ ...inp, width: 'auto' }}>
+            <option value="todos">Mayoristas y minoristas</option><option value="mayorista">Solo mayoristas</option><option value="minorista">Solo minoristas</option>
+          </select>
           <select value={filtro} onChange={e => setFiltro(e.target.value as any)} style={{ ...inp, width: 'auto' }}>
             <option value="vigentes">Vigentes</option><option value="todas">Todas</option>
           </select>
@@ -145,8 +154,11 @@ export default function CampanasPage() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
-        {lista.map(c => {
+      {GRUPOS.map(g => (
+        <section key={g.key} aria-label={g.label} style={{ marginBottom: '1.5rem' }}>
+          <h2 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>{g.label} <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '0.8rem' }}>· {g.items.length}</span></h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))', gap: 14 }}>
+        {g.items.map(c => {
           const est = ESTADOS.find(e => e.key === c.estado)
           const ts = tareasDe(c.id), hechas = ts.filter(t => estaCerrada(t.estado)).length
           const venc = ts.filter(vencida).length
@@ -169,6 +181,10 @@ export default function CampanasPage() {
             </div>
           )
         })}
+          </div>
+        </section>
+      ))}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
         {lista.length === 0 && <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}><p style={{ fontSize: '2rem' }}>📣</p><p style={{ fontWeight: 600 }}>No hay campañas {filtro === 'vigentes' ? 'vigentes' : ''}</p></div>}
       </div>
 
@@ -258,6 +274,11 @@ export default function CampanasPage() {
             <Campo label="Nombre *"><input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Ej: Congreso FOUBA" style={inp} /></Campo>
             <Campo label="Objetivo"><input value={form.objetivo} onChange={e => setForm(f => ({ ...f, objetivo: e.target.value }))} placeholder="¿Qué queremos lograr?" style={inp} /></Campo>
             <Campo label="Descripción"><textarea value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} rows={2} style={{ ...inp, resize: 'vertical' }} /></Campo>
+            <Campo label="Público">
+              <select value={form.canal} onChange={e => setForm(f => ({ ...f, canal: e.target.value }))} style={inp}>
+                <option value="">Sin definir</option><option value="mayorista">Mayoristas</option><option value="minorista">Minoristas</option>
+              </select>
+            </Campo>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0 12px' }}>
               <Campo label="Inicio"><input type="date" value={form.fecha_inicio} onChange={e => setForm(f => ({ ...f, fecha_inicio: e.target.value }))} style={inp} /></Campo>
               <Campo label="Fin"><input type="date" value={form.fecha_fin} onChange={e => setForm(f => ({ ...f, fecha_fin: e.target.value }))} style={inp} /></Campo>

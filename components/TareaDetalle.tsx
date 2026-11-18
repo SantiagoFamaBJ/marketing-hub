@@ -38,9 +38,9 @@ export default function TareaDetalle({ tarea, usuario, usuarios, permisos, campa
   const [guardando, setGuardando] = useState(false)
 
   const mapaUsuarios = Object.fromEntries(usuarios.map(u => [u.id, u]))
-  const soyParte = tarea.creado_por === usuario.id || tarea.asignados.some(a => a.id === usuario.id)
+  const soyParte = tarea.asignados.some(a => a.id === usuario.id)
   const puedeEditar = soyParte || permisos.aprobar_tareas
-  const puedeAprobar = !!permisos.aprobar_tareas && tarea.responsable_id !== usuario.id
+  const puedeAprobar = !!permisos.aprobar_tareas && (tarea.responsable_id !== usuario.id || !!permisos.es_coord)
   const est = estadoInfo(tarea.estado)
   const pri = prioridadInfo(tarea.prioridad)
   const cerrada = estaCerrada(tarea.estado)
@@ -164,7 +164,7 @@ export default function TareaDetalle({ tarea, usuario, usuarios, permisos, campa
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.7rem', fontWeight: 700, backgroundColor: pri.bg, color: pri.color, padding: '2px 10px', borderRadius: 99 }}>{pri.label}</span>
+                {tarea.prioridad && <span style={{ fontSize: '0.7rem', fontWeight: 700, backgroundColor: pri.bg, color: pri.color, padding: '2px 10px', borderRadius: 99 }}>{pri.label}</span>}
                 <span style={{ fontSize: '0.7rem', fontWeight: 700, backgroundColor: est.bg, color: est.color, padding: '2px 10px', borderRadius: 99 }}>{est.label}</span>
                 {tarea.categoria && <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: 99 }}>{tarea.categoria}</span>}
                 {tarea.recurrencia && <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#0ea5e9', border: '1px solid #0ea5e955', padding: '2px 8px', borderRadius: 99 }}>🔁 {tarea.recurrencia}</span>}

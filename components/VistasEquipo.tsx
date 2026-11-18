@@ -150,7 +150,7 @@ export function VistaSemana({ tareas, usuarios, usuario, permisos, onOpen, onCha
   const inicio = dias[0], fin = dias[6]
   const abiertas = tareas.filter(t => !estaCerrada(t.estado))
   const atrasadas = abiertas.filter(t => !!t.deadline && t.deadline < inicio && t.deadline < hoy).sort(porFecha)
-  const puedeMover = (t: Tarea) => t.asignados.some(a => a.id === usuario.id) || t.creado_por === usuario.id || !!permisos.aprobar_tareas
+  const puedeMover = (t: Tarea) => t.asignados.some(a => a.id === usuario.id) || !!permisos.aprobar_tareas
 
   const cargaPersona = usuarios.map(u => ({ u, n: abiertas.filter(t => !!t.deadline && t.deadline >= inicio && t.deadline <= fin && t.responsable_id === u.id).length })).filter(x => x.n > 0)
 

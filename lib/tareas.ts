@@ -5,7 +5,7 @@ export type Usuario = { id: string; nombre: string; slug: string; avatar_color: 
 export type Etiqueta = { id: string; nombre: string; color: string }
 export type Tarea = {
   id: string; titulo: string; descripcion: string | null
-  estado: string; prioridad: string; deadline: string | null
+  estado: string; prioridad: string | null; deadline: string | null
   creado_por: string | null; responsable_id: string | null
   categoria: string | null; campana_id: string | null
   requiere_aprobacion: boolean
@@ -43,7 +43,9 @@ export const PRIORIDADES: Record<string, { label: string; color: string; bg: str
   media: { label: '🟡 Media', color: '#f59e0b', bg: '#fffbeb', rank: 2 },
   baja: { label: '🟢 Baja', color: '#10b981', bg: '#f0fdf4', rank: 3 },
 }
-export const prioridadInfo = (p: string) => PRIORIDADES[p] || PRIORIDADES.media
+export const SIN_PRIORIDAD = { label: 'Sin prioridad', color: '#9ca3af', bg: '#f3f4f6', rank: 4 }
+export const prioridadInfo = (p: string | null | undefined) => (p ? PRIORIDADES[p] : null) || SIN_PRIORIDAD
+export const prioridadColor = (p: string | null | undefined) => prioridadInfo(p).color
 
 export const CATEGORIAS = ['Redes sociales', 'Email marketing', 'Web / SEO', 'Diseño', 'Eventos y cursos', 'Comercial', 'Administración', 'Otro']
 
@@ -80,10 +82,12 @@ const DEFAULT_PERMISOS: Record<string, Record<string, boolean>> = {
 }
 export type Permisos = Record<string, boolean>
 
-// Todos ven y pueden lo mismo. Reportes, presupuestos y vistas de gestión viven solo en /ADMIN.
-const PERMISOS_IGUALES: Permisos = { ver_reportes: false, ver_dashboard_equipo: false, ver_presupuestos: false, ver_todas_tareas: true, asignar_a_otros: true, aprobar_tareas: true, gestionar_campanas: true }
-export async function cargarPermisos(_rol?: string): Promise<Permisos> {
-  return { ...PERMISOS_IGUALES }
+// Todos ven todo. Cada persona modifica solo lo suyo; el coordinador (rol mkt_reporte) modifica, asigna y aprueba todo.
+// Reportes, presupuestos y vistas de gestión viven solo en /ADMIN. La regla real también está en la base (RLS).
+const PERMISOS_BASE: Permisos = { ver_reportes: false, ver_dashboard_equipo: false, ver_presupuestos: false, ver_todas_tareas: true, gestionar_campanas: true }
+export async function cargarPermisos(rol?: string): Promise<Permisos> {
+  const coord = rol === 'mkt_reporte'
+  return { ...PERMISOS_BASE, asignar_a_otros: coord, aprobar_tareas: coord, es_coord: coord }
 }
 
 export async function usuariosConPermiso(permiso: string): Promise<Usuario[]> {
@@ -142,6 +146,8 @@ export async function cargarTareas(opts: { usuarioId?: string; soloMias?: boolea
   return tareas
 }
 
+/** Puede modificarla: responsable o colaborador (el coordinador puede con todas, lo resuelve el permiso). */
+export const esParte = (t: Tarea, uid: string) => t.responsable_id === uid || t.asignados.some(a => a.id === uid)
 export const esMia = (t: Tarea, uid: string) => t.responsable_id === uid || t.asignados.some(a => a.id === uid) || t.creado_por === uid
 
 // ───────── Historial y notificaciones ─────────
@@ -299,7 +305,7 @@ export async function generarSiguienteRecurrente(tarea: Tarea, actor: Usuario) {
     recurrencia_origen_id: tarea.recurrencia_origen_id || tarea.id, estado: 'pendiente',
     deadline: proximaFecha(tarea.deadline, tarea.recurrencia, ancla),
   }).select().single()
-  if (!nueva) return
+  if (!nueva) { await supabase.from('mkt_tareas').update({ siguiente_generada: false }).eq('id', tarea.id); return } // no se pudo crear: queda pendiente de generar
   const ids = tarea.asignados.map(a => a.id)
   if (ids.length) await supabase.from('mkt_tarea_asignados').insert(ids.map(u => ({ tarea_id: nueva.id, usuario_id: u })))
   if (tarea.etiquetas.length) await supabase.from('mkt_tarea_etiquetas').insert(tarea.etiquetas.map(e => ({ tarea_id: nueva.id, etiqueta_id: e.id })))

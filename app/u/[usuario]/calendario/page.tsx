@@ -206,7 +206,7 @@ export default function CalendarioPage() {
                     <>
                       <p style={{ fontSize: '0.7rem', fontWeight: esHoy(dia) ? 700 : 400, color: esHoy(dia) ? '#f15922' : '#555', marginBottom: '3px' }}>{dia}</p>
                       <div className="cal-dots" aria-hidden="true">
-                        {[...evs.map(e => e.color), ...tars.map(t => PRIORIDAD_COLOR[t.prioridad]), ...cps.map(() => '#3b82f6'), ...cms.map(c => c.color)].slice(0, 6).map((col, k) => <span key={k} style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: col }} />)}
+                        {[...evs.map(e => e.color), ...tars.map(t => (PRIORIDAD_COLOR[t.prioridad || ''] || '#9ca3af')), ...cps.map(() => '#3b82f6'), ...cms.map(c => c.color)].slice(0, 6).map((col, k) => <span key={k} style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: col }} />)}
                       </div>
                       <div className="cal-chips">
                       {evs.slice(0, 2).map(e => (
@@ -215,7 +215,7 @@ export default function CalendarioPage() {
                         </div>
                       ))}
                       {tars.slice(0, 2).map(t => (
-                        <div key={t.id} onClick={() => setDetalleId(t.id)} style={{ backgroundColor: PRIORIDAD_COLOR[t.prioridad] + '22', color: PRIORIDAD_COLOR[t.prioridad], border: `1px solid ${PRIORIDAD_COLOR[t.prioridad]}44`, borderRadius: '3px', padding: '1px 4px', marginBottom: '2px', fontSize: '0.55rem', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <div key={t.id} onClick={() => setDetalleId(t.id)} style={{ backgroundColor: (PRIORIDAD_COLOR[t.prioridad || ''] || '#9ca3af') + '22', color: (PRIORIDAD_COLOR[t.prioridad || ''] || '#9ca3af'), border: `1px solid ${(PRIORIDAD_COLOR[t.prioridad || ''] || '#9ca3af')}44`, borderRadius: '3px', padding: '1px 4px', marginBottom: '2px', fontSize: '0.55rem', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           ✅ {t.titulo}
                         </div>
                       ))}
@@ -250,7 +250,7 @@ export default function CalendarioPage() {
               return (
                 <div>
                   {evs.map(e => <button key={e.id} onClick={() => seleccionarEvento(e)} style={{ ...fila, cursor: 'pointer', borderLeft: `4px solid ${e.color}` }}>{TIPOS.find(t => t.key === e.tipo)?.emoji} <span style={{ minWidth: 0, flex: 1 }}>{e.titulo}</span></button>)}
-                  {tars.map(t => <button key={t.id} onClick={() => setDetalleId(t.id)} style={{ ...fila, cursor: 'pointer', borderLeft: `4px solid ${PRIORIDAD_COLOR[t.prioridad]}` }}>✅ <span style={{ minWidth: 0, flex: 1 }}>{t.titulo}</span></button>)}
+                  {tars.map(t => <button key={t.id} onClick={() => setDetalleId(t.id)} style={{ ...fila, cursor: 'pointer', borderLeft: `4px solid ${(PRIORIDAD_COLOR[t.prioridad || ''] || '#9ca3af')}` }}>✅ <span style={{ minWidth: 0, flex: 1 }}>{t.titulo}</span></button>)}
                   {cps.map(c => <div key={c.id} style={{ ...fila, borderLeft: '4px solid #3b82f6' }}>✍️ <span style={{ minWidth: 0, flex: 1 }}>{c.nombre}</span></div>)}
                   {cms.map(c => <div key={c.id} style={{ ...fila, borderLeft: `4px solid ${c.color}` }}>📣 <span style={{ minWidth: 0, flex: 1 }}>{c.nombre}</span></div>)}
                 </div>

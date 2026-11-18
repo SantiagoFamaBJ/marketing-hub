@@ -23,7 +23,7 @@ export default function TareaForm({ tarea, usuario, usuarios, etiquetas, campana
   const [f, setF] = useState({
     titulo: tarea?.titulo || '',
     descripcion: tarea?.descripcion || '',
-    prioridad: tarea?.prioridad || 'media',
+    prioridad: tarea?.prioridad || '',
     deadline: tarea?.deadline || '',
     categoria: tarea?.categoria || '',
     campana_id: tarea?.campana_id || campanaInicial || '',
@@ -44,12 +44,13 @@ export default function TareaForm({ tarea, usuario, usuarios, etiquetas, campana
   async function guardar() {
     if (!f.titulo.trim() || guardando) return
     setGuardando(true)
-    const resp = puedeAsignar ? f.responsable_id : usuario.id
-    const colabs = puedeAsignar ? f.colaboradores.filter(id => id !== resp) : []
+    // Sin permiso de asignar: al editar se conserva el equipo de la tarea; al crear, es solo para uno mismo
+    const resp = puedeAsignar ? f.responsable_id : (tarea?.responsable_id || usuario.id)
+    const colabs = puedeAsignar ? f.colaboradores.filter(id => id !== resp) : (tarea ? tarea.asignados.filter(a => a.id !== resp).map(a => a.id) : [])
     const todos = [resp, ...colabs]
     const payload = {
       titulo: f.titulo.trim(), descripcion: f.descripcion && f.descripcion !== '<p></p>' ? f.descripcion : null,
-      prioridad: f.prioridad, deadline: f.deadline || null, categoria: f.categoria || null,
+      prioridad: f.prioridad || null, deadline: f.deadline || null, categoria: f.categoria || null,
       campana_id: f.campana_id || null, responsable_id: resp, requiere_aprobacion: f.requiere_aprobacion, recurrencia: f.deadline ? (f.recurrencia || null) : null,
       actualizado_en: new Date().toISOString(),
     }
@@ -93,8 +94,9 @@ export default function TareaForm({ tarea, usuario, usuarios, etiquetas, campana
         <Campo label="Título *"><input value={f.titulo} onChange={e => set('titulo', e.target.value)} placeholder="¿Qué hay que hacer?" style={inp} autoFocus={typeof window !== 'undefined' && !window.matchMedia('(pointer: coarse)').matches} /></Campo>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 150px), 1fr))', gap: '0 0.75rem' }}>
-          <Campo label="Prioridad">
+          <Campo label="Prioridad (opcional)">
             <select value={f.prioridad} onChange={e => set('prioridad', e.target.value)} style={inp}>
+              <option value="">Sin prioridad</option>
               {Object.entries(PRIORIDADES).sort((a, b) => b[1].rank - a[1].rank).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>
           </Campo>
@@ -125,11 +127,17 @@ export default function TareaForm({ tarea, usuario, usuarios, etiquetas, campana
           )}
         </div>
 
-        <Campo label="Responsable principal">
-          <div className="chip-row" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {candidatos.map(u => <button key={u.id} type="button" onClick={() => set('responsable_id', u.id)} style={chip(f.responsable_id === u.id)}>{u.avatar_emoji} {u.nombre}</button>)}
-          </div>
-        </Campo>
+        {puedeAsignar ? (
+          <Campo label="Responsable principal">
+            <div className="chip-row" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {candidatos.map(u => <button key={u.id} type="button" onClick={() => set('responsable_id', u.id)} style={chip(f.responsable_id === u.id)}>{u.avatar_emoji} {u.nombre}</button>)}
+            </div>
+          </Campo>
+        ) : (
+          <Campo label="Responsable">
+            <p style={{ fontSize: '0.85rem', color: 'var(--text)' }}>{tarea && tarea.responsable_id !== usuario.id ? (tarea.responsable?.nombre || 'Sin responsable') : `${usuario.nombre} (vos)`} <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>· las tareas las asigna Santiago</span></p>
+          </Campo>
+        )}
         {puedeAsignar && (
           <Campo label="Colaboradores (opcional)">
             <div className="chip-row" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
