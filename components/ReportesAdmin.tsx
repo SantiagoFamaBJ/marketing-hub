@@ -49,7 +49,7 @@ export default function ReportesAdmin() {
   useEffect(() => { supabase.from('mkt_usuarios').select('*').eq('activo', true).order('creado_en').then(({ data }) => setActor((data || []).find((u: any) => u.rol === 'mkt_reporte') || (data || [])[0] || null)) }, [])
   return (
     <div>
-      <div style={{ display: 'flex', gap: 6, marginBottom: '1.25rem', overflowX: 'auto' }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: '1.25rem', flexWrap: 'wrap' }}>
         {([['resumen', '📊 Resumen'], ['analisis', '🔎 Análisis'], ['pasante', '🌱 Seguimiento'], ['presupuestos', '💰 Presupuestos']] as const).map(([k, l]) => (
           <button key={k} onClick={() => setModo(k)} style={{ whiteSpace: 'nowrap', padding: '0.45rem 0.9rem', borderRadius: 8, border: '1.5px solid var(--border)', cursor: 'pointer', fontSize: '0.82rem', fontWeight: modo === k ? 700 : 400, backgroundColor: modo === k ? '#f15922' : 'var(--bg-card)', color: modo === k ? '#fff' : 'var(--text)' }}>{l}</button>
         ))}

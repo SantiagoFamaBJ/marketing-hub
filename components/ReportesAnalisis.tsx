@@ -69,7 +69,7 @@ export default function ReportesAnalisis() {
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 14, paddingBottom: 2 }}>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14, paddingBottom: 2 }}>
         {secciones.map(([k, l]) => (
           <button key={k} onClick={() => setSec(k)} style={{ whiteSpace: 'nowrap', padding: '0.4rem 0.8rem', borderRadius: 99, border: '1.5px solid var(--border)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: sec === k ? 700 : 400, backgroundColor: sec === k ? '#f15922' : 'var(--bg-card)', color: sec === k ? '#fff' : 'var(--text)' }}>{l}</button>
         ))}

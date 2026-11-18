@@ -163,15 +163,15 @@ export default function CopysPage() {
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-        <h1 style={{ fontSize: '1.6rem', fontWeight: 700, color: '#1a1a1a' }}>✍️ Copys</h1>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <div style={{ display: 'flex', border: '1.5px solid #e8e8e8', borderRadius: '8px', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <h1 style={{ fontSize: 'clamp(1.25rem, 4vw, 1.6rem)', fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap' }}>✍️ Copys</h1>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', border: '1.5px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
             {(['plantillas', 'historial'] as const).map(v => (
               <button key={v} onClick={() => setVista(v)} style={{
                 padding: '0.375rem 0.875rem', border: 'none',
-                backgroundColor: vista === v ? '#f15922' : '#fff',
-                color: vista === v ? '#fff' : '#666',
+                backgroundColor: vista === v ? '#f15922' : 'var(--bg-card)',
+                color: vista === v ? '#fff' : 'var(--text-muted)', whiteSpace: 'nowrap',
                 cursor: 'pointer', fontSize: '0.8rem', fontWeight: vista === v ? 600 : 400,
               }}>
                 {v === 'plantillas' ? '📋 Plantillas' : '🕐 Historial'}
@@ -180,7 +180,7 @@ export default function CopysPage() {
           </div>
           <button onClick={() => setNuevoOpen(true)} style={{
             backgroundColor: '#f15922', color: '#fff', border: 'none',
-            borderRadius: '8px', padding: '0.5rem 1rem', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer',
+            borderRadius: '8px', padding: '0.5rem 1rem', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer', whiteSpace: 'nowrap',
           }}>+ Nuevo copy</button>
           {usuario.rol === 'admin' && (
             <button onClick={abrirNuevaPlantilla} style={{

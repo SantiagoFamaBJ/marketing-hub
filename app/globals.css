@@ -91,3 +91,7 @@ body {
 
 /* Transiciones suaves */
 a, button { transition: all 0.15s ease; }
+
+/* Móvil: los campos nunca deben pasarse del contenedor (fechas, selects) */
+input, select, textarea { max-width: 100%; }
+input[type="date"], input[type="datetime-local"] { min-width: 0; }

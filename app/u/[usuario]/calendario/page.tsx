@@ -46,6 +46,7 @@ export default function CalendarioPage() {
   const [copys, setCopys] = useState<CopyCal[]>([])
   const [camps, setCamps] = useState<CampCal[]>([])
   const [campanas, setCampanas] = useState<Campana[]>([])
+  const [diaSel, setDiaSel] = useState<number | null>(null)
   const [fCat, setFCat] = useState(''); const [fResp, setFResp] = useState('')
   const [ver, setVer] = useState({ tareas: true, eventos: true, copys: true, campanas: true })
   const [detalleId, setDetalleId] = useState<string | null>(null)
@@ -138,6 +139,9 @@ export default function CalendarioPage() {
   const campsDia = (dia: number) => ver.campanas ? camps.filter(c => c.fecha_inicio! <= diaStr(dia) && c.fecha_fin! >= diaStr(dia)) : []
   const esHoy = (dia: number) => dia === hoy.getDate() && mes === hoy.getMonth() && anio === hoy.getFullYear()
 
+  const esMesActual = mes === hoy.getMonth() && anio === hoy.getFullYear()
+  const diaActivo = diaSel && diaSel <= diasEnMes ? diaSel : (esMesActual ? hoy.getDate() : 1)
+
   if (!usuario || !permisos) return null
 
   return (
@@ -163,28 +167,48 @@ export default function CalendarioPage() {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: seleccionado ? 'minmax(0,1fr) 300px' : '1fr', gap: '1.25rem' }}>
+      <style>{`
+        .cal-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:1.25rem}
+        .cal-layout.con-panel{grid-template-columns:minmax(0,1fr) 300px}
+        .cal-card{padding:1.25rem}
+        .cal-dots,.cal-agenda{display:none}
+        .cal-cell{cursor:pointer}
+        .cal-cell:focus-visible{outline:2px solid #f15922;outline-offset:1px}
+        @media(max-width:700px){
+          .cal-layout.con-panel{grid-template-columns:minmax(0,1fr)}
+          .cal-card{padding:0.6rem}
+          .cal-chips{display:none}
+          .cal-dots{display:flex;flex-wrap:wrap;gap:2px;margin-top:2px}
+          .cal-cell{min-height:50px !important;padding:3px !important}
+          .cal-agenda{display:block}
+        }
+      `}</style>
+      <div className={`cal-layout${seleccionado ? ' con-panel' : ''}`}>
         {/* Calendario */}
-        <div style={{ backgroundColor: 'var(--bg-card)', border: '1.5px solid var(--border)', borderRadius: '14px', padding: '1.25rem', overflowX: 'auto' }}>
+        <div className="cal-card" style={{ backgroundColor: 'var(--bg-card)', border: '1.5px solid var(--border)', borderRadius: '14px', overflowX: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
             <button onClick={() => { if (mes === 0) { setMes(11); setAnio(a => a - 1) } else setMes(m => m - 1) }} style={{ background: 'none', border: '1.5px solid var(--border)', borderRadius: '8px', padding: '0.375rem 0.75rem', cursor: 'pointer' }}>‹</button>
             <h2 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)' }}>{MESES[mes]} {anio}</h2>
             <button onClick={() => { if (mes === 11) { setMes(0); setAnio(a => a + 1) } else setMes(m => m + 1) }} style={{ background: 'none', border: '1.5px solid var(--border)', borderRadius: '8px', padding: '0.375rem 0.75rem', cursor: 'pointer' }}>›</button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '4px' }}>
-            {DIAS_CORTO.map(d => <div key={d} style={{ textAlign: 'center', fontSize: '0.7rem', fontWeight: 700, color: '#a0a0a0', padding: '0.25rem' }}>{d}</div>)}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '2px', marginBottom: '4px' }}>
+            {DIAS_CORTO.map((d, i) => <div key={i} style={{ textAlign: 'center', fontSize: '0.7rem', fontWeight: 700, color: '#a0a0a0', padding: '0.25rem' }}>{d}</div>)}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '2px' }}>
             {celdas.map((dia, i) => {
               const evs = dia ? eventosDia(dia) : []
               const tars = dia ? tareasDia(dia) : []
               const cps = dia ? copysDia(dia) : []
               const cms = dia ? campsDia(dia) : []
               return (
-                <div key={i} style={{ minHeight: 72, borderRadius: '6px', padding: '0.25rem', backgroundColor: dia && esHoy(dia) ? '#f9ddd3' : 'var(--bg)', border: `1.5px solid ${dia && esHoy(dia) ? '#f15922' : 'var(--border)'}` }}>
+                <div key={i} className={dia ? 'cal-cell' : undefined} {...(dia ? { role: 'button', tabIndex: 0, 'aria-label': `Día ${dia}`, 'aria-pressed': diaActivo === dia, onClick: () => setDiaSel(dia), onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDiaSel(dia) } } } : {})} style={{ minHeight: 72, minWidth: 0, overflow: 'hidden', borderRadius: '6px', padding: '0.25rem', backgroundColor: dia && esHoy(dia) ? '#f9ddd3' : 'var(--bg)', border: `1.5px solid ${dia && esHoy(dia) ? '#f15922' : dia && dia === diaActivo ? '#f15922aa' : 'var(--border)'}` }}>
                   {dia && (
                     <>
                       <p style={{ fontSize: '0.7rem', fontWeight: esHoy(dia) ? 700 : 400, color: esHoy(dia) ? '#f15922' : '#555', marginBottom: '3px' }}>{dia}</p>
+                      <div className="cal-dots" aria-hidden="true">
+                        {[...evs.map(e => e.color), ...tars.map(t => PRIORIDAD_COLOR[t.prioridad]), ...cps.map(() => '#3b82f6'), ...cms.map(c => c.color)].slice(0, 6).map((col, k) => <span key={k} style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: col }} />)}
+                      </div>
+                      <div className="cal-chips">
                       {evs.slice(0, 2).map(e => (
                         <div key={e.id} onClick={() => seleccionarEvento(e)} style={{ backgroundColor: e.color, color: '#fff', borderRadius: '3px', padding: '1px 4px', marginBottom: '2px', fontSize: '0.55rem', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {TIPOS.find(t => t.key === e.tipo)?.emoji} {e.titulo}
@@ -208,11 +232,30 @@ export default function CalendarioPage() {
                         )
                       })}
                       {(evs.length + tars.length) > 4 && <p style={{ fontSize: '0.55rem', color: 'var(--text-muted)' }}>+{evs.length + tars.length - 4}</p>}
+                      </div>
                     </>
                   )}
                 </div>
               )
             })}
+          </div>
+          <div className="cal-agenda" style={{ marginTop: '0.75rem', borderTop: '1.5px solid var(--border)', paddingTop: '0.75rem' }}>
+            <p style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>
+              {new Date(anio, mes, diaActivo, 12).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </p>
+            {(() => {
+              const evs = eventosDia(diaActivo), tars = tareasDia(diaActivo), cps = copysDia(diaActivo), cms = campsDia(diaActivo)
+              if (!evs.length && !tars.length && !cps.length && !cms.length) return <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Sin nada para este día.</p>
+              const fila: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '0.5rem 0.6rem', marginBottom: 6, borderRadius: 8, border: '1.5px solid var(--border)', backgroundColor: 'var(--bg)', color: 'var(--text)', fontSize: '0.8rem', minHeight: 40 }
+              return (
+                <div>
+                  {evs.map(e => <button key={e.id} onClick={() => seleccionarEvento(e)} style={{ ...fila, cursor: 'pointer', borderLeft: `4px solid ${e.color}` }}>{TIPOS.find(t => t.key === e.tipo)?.emoji} <span style={{ minWidth: 0, flex: 1 }}>{e.titulo}</span></button>)}
+                  {tars.map(t => <button key={t.id} onClick={() => setDetalleId(t.id)} style={{ ...fila, cursor: 'pointer', borderLeft: `4px solid ${PRIORIDAD_COLOR[t.prioridad]}` }}>✅ <span style={{ minWidth: 0, flex: 1 }}>{t.titulo}</span></button>)}
+                  {cps.map(c => <div key={c.id} style={{ ...fila, borderLeft: '4px solid #3b82f6' }}>✍️ <span style={{ minWidth: 0, flex: 1 }}>{c.nombre}</span></div>)}
+                  {cms.map(c => <div key={c.id} style={{ ...fila, borderLeft: `4px solid ${c.color}` }}>📣 <span style={{ minWidth: 0, flex: 1 }}>{c.nombre}</span></div>)}
+                </div>
+              )
+            })()}
           </div>
           <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}><span style={{ width: 10, height: 10, borderRadius: '2px', backgroundColor: '#f15922', display: 'inline-block' }} /> Eventos</span>
@@ -288,7 +331,7 @@ export default function CalendarioPage() {
                 {TIPOS.map(t => <option key={t.key} value={t.key}>{t.emoji} {t.label}</option>)}
               </select>
             </Campo>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
               <Campo label="Fecha inicio *">
                 <input type="date" value={form.fecha_inicio} onChange={e => setForm(f => ({ ...f, fecha_inicio: e.target.value }))} style={inputStyle} />
               </Campo>
