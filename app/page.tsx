@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { credencial } from '@/lib/pin'
 
 const inp: React.CSSProperties = { width: '100%', padding: '0.7rem 0.9rem', border: '1.5px solid #e8e8e8', borderRadius: 10, fontSize: '0.95rem', outline: 'none', color: '#1a1a1a', backgroundColor: '#fff' }
 
@@ -38,8 +39,8 @@ export default function HomePage() {
   async function entrar(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true); setError('')
-    const { error: err } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password: pass })
-    if (err) { setError('Email o contraseña incorrectos.'); setLoading(false); return }
+    const { error: err } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password: credencial(pass) })
+    if (err) { setError('Email o PIN/contraseña incorrectos.'); setLoading(false); return }
     const u = await perfil()
     if (!u) { setError('Tu usuario no tiene acceso al Marketing Hub.'); setLoading(false); return }
     router.push(`/u/${u.slug}`)
@@ -60,7 +61,7 @@ export default function HomePage() {
       <form onSubmit={entrar} style={{ width: '100%', maxWidth: 340, backgroundColor: '#fff', border: '1.5px solid #e8e8e8', borderRadius: 16, padding: '1.5rem' }}>
         <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#555', display: 'block', marginBottom: 6 }}>Email</label>
         <input type="email" autoComplete="username" required value={email} onChange={e => setEmail(e.target.value)} style={{ ...inp, marginBottom: 14 }} />
-        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#555', display: 'block', marginBottom: 6 }}>Contraseña</label>
+        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#555', display: 'block', marginBottom: 6 }}>PIN o contraseña</label>
         <input type="password" autoComplete="current-password" required value={pass} onChange={e => setPass(e.target.value)} style={{ ...inp, marginBottom: 14 }} />
         {error && <p role="alert" style={{ fontSize: '0.82rem', color: '#ef4444', marginBottom: 12 }}>{error}</p>}
         <button type="submit" disabled={loading} style={{ width: '100%', padding: '0.75rem', border: 'none', borderRadius: 10, backgroundColor: '#f15922', color: '#fff', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer', opacity: loading ? 0.7 : 1 }}>{loading ? 'Entrando…' : 'Entrar'}</button>

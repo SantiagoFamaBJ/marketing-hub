@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter, usePathname, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import { credencial, claveValida } from '@/lib/pin'
 import { cargarPermisos, Permisos, rolCorto, NOTIF_TIPOS, estadoInfo } from '@/lib/tareas'
 
 type Usuario = { id: string; nombre: string; slug: string; avatar_color: string; avatar_emoji: string; rol: string }
@@ -45,9 +46,9 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
   const [pw1, setPw1] = useState(''); const [pw2, setPw2] = useState(''); const [pwMsg, setPwMsg] = useState('')
   async function cerrarSesion() { await supabase.auth.signOut(); sessionStorage.removeItem('mkt_usuario'); router.push('/') }
   async function cambiarPass() {
-    if (pw1.length < 8) return setPwMsg('Mínimo 8 caracteres.')
+    if (!claveValida(pw1)) return setPwMsg('Poné un PIN de 4 dígitos o una contraseña de 8+ caracteres.')
     if (pw1 !== pw2) return setPwMsg('Las contraseñas no coinciden.')
-    const { error } = await supabase.auth.updateUser({ password: pw1 })
+    const { error } = await supabase.auth.updateUser({ password: credencial(pw1) })
     if (error) return setPwMsg(error.message)
     setPwMsg('✅ Contraseña actualizada.'); setPw1(''); setPw2('')
   }
@@ -357,7 +358,7 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '1rem' }} onClick={e => { if (e.target === e.currentTarget) setPwOpen(false) }}>
           <div style={{ backgroundColor: c.sidebar, borderRadius: 16, padding: '1.25rem', width: '100%', maxWidth: 360 }}>
             <h2 style={{ fontSize: '1.05rem', fontWeight: 700, color: c.text, marginBottom: 12 }}>🔑 Cambiar contraseña</h2>
-            <input type="password" autoComplete="new-password" placeholder="Nueva contraseña (mín. 8)" value={pw1} onChange={e => setPw1(e.target.value)} style={{ width: '100%', padding: '0.6rem 0.8rem', border: `1.5px solid ${c.border}`, borderRadius: 8, marginBottom: 8, backgroundColor: 'var(--input-bg)', color: c.text }} />
+            <input type="password" autoComplete="new-password" placeholder="Nuevo PIN (4 dígitos) o contraseña (8+)" value={pw1} onChange={e => setPw1(e.target.value)} style={{ width: '100%', padding: '0.6rem 0.8rem', border: `1.5px solid ${c.border}`, borderRadius: 8, marginBottom: 8, backgroundColor: 'var(--input-bg)', color: c.text }} />
             <input type="password" autoComplete="new-password" placeholder="Repetir contraseña" value={pw2} onChange={e => setPw2(e.target.value)} style={{ width: '100%', padding: '0.6rem 0.8rem', border: `1.5px solid ${c.border}`, borderRadius: 8, marginBottom: 8, backgroundColor: 'var(--input-bg)', color: c.text }} />
             {pwMsg && <p style={{ fontSize: '0.82rem', color: pwMsg.startsWith('✅') ? '#10b981' : '#ef4444', marginBottom: 8 }}>{pwMsg}</p>}
             <div style={{ display: 'flex', gap: 8 }}>

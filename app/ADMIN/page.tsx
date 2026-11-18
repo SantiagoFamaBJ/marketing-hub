@@ -4,6 +4,7 @@ import ReportesAdmin from '@/components/ReportesAdmin'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { credencial, claveValida } from '@/lib/pin'
 import { cargarTareas, ROLES, PERMISOS, ESTADOS, estadoInfo, estaCerrada } from '@/lib/tareas'
 
 type Usuario = { id: string; nombre: string; slug: string; avatar_color: string; avatar_emoji: string; rol: string; activo: boolean; auth_user_id?: string | null }
@@ -133,7 +134,7 @@ function AdminInner() {
   async function darAcceso() {
     if (!editandoUsuario) return
     setAcc(a => ({ ...a, cargando: true, msg: '' }))
-    const { data, error } = await supabase.functions.invoke('mkt-admin-usuarios', { body: { accion: 'dar_acceso', usuario_id: editandoUsuario.id, email: acc.email, password: acc.password } })
+    const { data, error } = await supabase.functions.invoke('mkt-admin-usuarios', { body: { accion: 'dar_acceso', usuario_id: editandoUsuario.id, email: acc.email, password: credencial(acc.password) } })
     let msg = '✅ Acceso listo. Pasale el email y la contraseña a la persona (después se la puede cambiar con el 🔑).'
     if (error || data?.error) {
       msg = '❌ ' + (data?.error || (await (error as any)?.context?.json?.().then((j: any) => j.error).catch(() => null)) || error?.message || 'No se pudo')
@@ -424,8 +425,8 @@ function AdminInner() {
             {editandoUsuario && (
               <Campo label={editandoUsuario.auth_user_id ? 'Acceso (ya tiene) — cambiar email o contraseña' : 'Acceso al Hub (todavía no tiene)'}>
                 <input type="email" value={acc.email} onChange={e => setAcc(a => ({ ...a, email: e.target.value }))} placeholder="Email con el que va a entrar" style={{ ...inputStyle, marginBottom: 6 }} />
-                <input type="text" value={acc.password} onChange={e => setAcc(a => ({ ...a, password: e.target.value }))} placeholder="Contraseña inicial (mín. 8)" style={{ ...inputStyle, marginBottom: 6 }} />
-                <button type="button" onClick={darAcceso} disabled={acc.cargando || !acc.email || acc.password.length < 8} style={{ padding: '0.5rem 0.9rem', border: 'none', borderRadius: 8, backgroundColor: '#f15922', color: '#fff', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer', opacity: acc.cargando || !acc.email || acc.password.length < 8 ? 0.6 : 1 }}>{acc.cargando ? 'Guardando…' : editandoUsuario.auth_user_id ? 'Actualizar acceso' : 'Dar acceso'}</button>
+                <input type="text" value={acc.password} onChange={e => setAcc(a => ({ ...a, password: e.target.value }))} placeholder="PIN (4 dígitos) o contraseña (8+)" style={{ ...inputStyle, marginBottom: 6 }} />
+                <button type="button" onClick={darAcceso} disabled={acc.cargando || !acc.email || !claveValida(acc.password)} style={{ padding: '0.5rem 0.9rem', border: 'none', borderRadius: 8, backgroundColor: '#f15922', color: '#fff', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer', opacity: acc.cargando || !acc.email || !claveValida(acc.password) ? 0.6 : 1 }}>{acc.cargando ? 'Guardando…' : editandoUsuario.auth_user_id ? 'Actualizar acceso' : 'Dar acceso'}</button>
                 {acc.msg && <p style={{ fontSize: '0.78rem', marginTop: 6, color: acc.msg.startsWith('✅') ? '#10b981' : '#ef4444' }}>{acc.msg}</p>}
               </Campo>
             )}
