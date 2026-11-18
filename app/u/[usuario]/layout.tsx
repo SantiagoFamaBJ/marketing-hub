@@ -6,10 +6,10 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { credencial, claveValida } from '@/lib/pin'
 import { useModulos, moduloActivo, MODULOS } from '@/lib/modulos'
-import { cargarPermisos, Permisos, rolCorto, NOTIF_TIPOS, estadoInfo } from '@/lib/tareas'
+import { cargarPermisos, Permisos, rolCorto, NOTIF_TIPOS, estadoInfo, generarAvisosEmail } from '@/lib/tareas'
 
 type Usuario = { id: string; nombre: string; slug: string; avatar_color: string; avatar_emoji: string; rol: string }
-type Notificacion = { id: string; tipo: string; titulo: string; mensaje: string | null; leida: boolean; creado_en: string }
+type Notificacion = { id: string; tipo: string; titulo: string; mensaje: string | null; leida: boolean; creado_en: string; referencia_tipo?: string | null }
 type ResultadoBusqueda = { id: string; tipo: 'tarea' | 'evento' | 'copy'; titulo: string; subtitulo?: string }
 
 const navItems = [
@@ -74,6 +74,7 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
     })()
     fetchNotificaciones(u.id)
     fetchTareasVencidas(u.id)
+    generarAvisosEmail(u.id).then(() => fetchNotificaciones(u.id)).catch(() => {})
     cargarPermisos(u.rol).then(setPermisos)
     supabase.from('mkt_notif_prefs').select('tipo').eq('usuario_id', u.id).eq('activa', false).then(({ data }) => setApagadas((data || []).map((x: any) => x.tipo)))
     const dark = localStorage.getItem('darkMode') === 'true'
@@ -357,7 +358,7 @@ export default function UsuarioLayout({ children }: { children: React.ReactNode 
               <div style={{ maxHeight: 340, overflowY: 'auto' }}>
                 {notificaciones.map(n => (
                   <div key={n.id} style={{ padding: '0.7rem 1rem', borderBottom: `1px solid ${c.border}`, display: 'flex', gap: '0.625rem', backgroundColor: darkMode ? '#1f1510' : '#fff9f7' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ flex: 1, minWidth: 0, cursor: n.referencia_tipo === 'email' ? 'pointer' : 'default' }} onClick={n.referencia_tipo === 'email' && usuario ? () => { marcarLeida(n.id); router.push(`/u/${usuario.slug}/email`) } : undefined}>
                       <p style={{ fontSize: '0.825rem', fontWeight: 600, color: c.text, marginBottom: 2 }}>{n.titulo}</p>
                       {n.mensaje && <p style={{ fontSize: '0.775rem', color: c.textMuted, wordBreak: 'break-word' }}>{n.mensaje}</p>}
                       <p style={{ fontSize: '0.68rem', color: c.textMuted, marginTop: 3 }}>{new Date(n.creado_en).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>

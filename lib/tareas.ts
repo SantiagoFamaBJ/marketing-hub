@@ -166,6 +166,7 @@ export const NOTIF_TIPOS: Record<string, string> = {
   tarea_vence_3dias: 'Tarea por vencer (3 días)',
   tarea_vence_hoy: 'Tarea que vence hoy',
   tarea_vencida: 'Tarea vencida',
+  email_resultados: 'Cargar resultados de un email',
 }
 
 /** Crea una notificación respetando las preferencias de cada persona. No se notifica a uno mismo. */
@@ -194,6 +195,17 @@ export async function generarAvisosVencimiento(uid: string, tareas: Tarea[]) {
     else if (t.deadline <= en3) { tipo = 'tarea_vence_3dias'; titulo = 'Vence en pocos días' }
     if (tipo && !ya.has(`${tipo}:${t.id}`)) await notificar([uid], null, tipo, titulo, `${t.titulo} · ${fechaCorta(t.deadline)}`, t.id)
   }
+}
+
+/** Avisa (una sola vez por envío) cuando pasaron 3 días del envío y faltan los resultados. Va al responsable del envío. */
+export async function generarAvisosEmail(uid: string) {
+  const d = new Date(); d.setDate(d.getDate() - 3)
+  const limite = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const { data: envs } = await supabase.from('mkt_email_envios').select('id, asunto, fecha_envio').eq('responsable_id', uid).eq('estado', 'enviado').is('resultados_cargados_en', null).lte('fecha_envio', limite)
+  if (!envs || envs.length === 0) return
+  const { data: prev } = await supabase.from('mkt_notificaciones').select('referencia_id').eq('usuario_id', uid).eq('tipo', 'email_resultados').in('referencia_id', envs.map((e: any) => e.id))
+  const ya = new Set((prev || []).map((p: any) => p.referencia_id))
+  for (const e of envs as any[]) if (!ya.has(e.id)) await notificar([uid], null, 'email_resultados', 'Faltan los resultados de un email', `${e.asunto} · enviado ${fechaCorta(e.fecha_envio)}`, e.id, 'email')
 }
 
 // ───────── Acciones de estado y aprobación ─────────
