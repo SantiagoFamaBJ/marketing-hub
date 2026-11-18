@@ -12,7 +12,7 @@ type Campana = { id: string; nombre: string }
 const inp: React.CSSProperties = { width: '100%', padding: '0.625rem 0.875rem', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', outline: 'none', color: 'var(--text)', backgroundColor: 'var(--input-bg)' }
 
 function Campo({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div style={{ marginBottom: '0.875rem' }}><label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>{label}</label>{children}</div>
+  return <div style={{ marginBottom: '0.875rem', minWidth: 0 }}><label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>{label}</label>{children}</div>
 }
 
 export default function TareaForm({ tarea, usuario, usuarios, etiquetas, campanas, permisos, campanaInicial, onClose, onSaved, onNuevaEtiqueta }: {
@@ -86,13 +86,13 @@ export default function TareaForm({ tarea, usuario, usuarios, etiquetas, campana
   const chip = (activo: boolean): React.CSSProperties => ({ display: 'flex', alignItems: 'center', gap: 6, padding: '0.35rem 0.7rem', borderRadius: 99, cursor: 'pointer', fontSize: '0.8rem', border: activo ? '2px solid #f15922' : '1.5px solid var(--border)', backgroundColor: activo ? '#f9ddd3' : 'var(--bg-card)', color: activo ? '#c94a1a' : 'var(--text)', fontWeight: activo ? 600 : 400 })
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '0.75rem' }}
+    <div className="modal-overlay" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '0.75rem' }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ backgroundColor: 'var(--bg-card)', borderRadius: 16, padding: '1.25rem', width: '100%', maxWidth: 580, maxHeight: '94vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
+      <div className="modal-sheet" style={{ backgroundColor: 'var(--bg-card)', borderRadius: 16, padding: '1.25rem', width: '100%', maxWidth: 580, maxHeight: '94vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
         <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', color: 'var(--text)' }}>{tarea ? 'Editar tarea' : 'Nueva tarea'}</h2>
-        <Campo label="Título *"><input value={f.titulo} onChange={e => set('titulo', e.target.value)} placeholder="¿Qué hay que hacer?" style={inp} autoFocus /></Campo>
+        <Campo label="Título *"><input value={f.titulo} onChange={e => set('titulo', e.target.value)} placeholder="¿Qué hay que hacer?" style={inp} autoFocus={typeof window !== 'undefined' && !window.matchMedia('(pointer: coarse)').matches} /></Campo>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0 0.75rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 150px), 1fr))', gap: '0 0.75rem' }}>
           <Campo label="Prioridad">
             <select value={f.prioridad} onChange={e => set('prioridad', e.target.value)} style={inp}>
               {Object.entries(PRIORIDADES).sort((a, b) => b[1].rank - a[1].rank).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
@@ -123,13 +123,13 @@ export default function TareaForm({ tarea, usuario, usuarios, etiquetas, campana
         </div>
 
         <Campo label="Responsable principal">
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <div className="chip-row" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {candidatos.map(u => <button key={u.id} type="button" onClick={() => set('responsable_id', u.id)} style={chip(f.responsable_id === u.id)}>{u.avatar_emoji} {u.nombre}</button>)}
           </div>
         </Campo>
         {puedeAsignar && (
           <Campo label="Colaboradores (opcional)">
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <div className="chip-row" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {usuarios.filter(u => u.id !== f.responsable_id).map(u => <button key={u.id} type="button" onClick={() => toggle('colaboradores', u.id)} style={chip(f.colaboradores.includes(u.id))}>{u.avatar_emoji} {u.nombre}</button>)}
             </div>
           </Campo>
@@ -153,7 +153,7 @@ export default function TareaForm({ tarea, usuario, usuarios, etiquetas, campana
         )}
 
         <Campo label="Etiquetas">
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <div className="chip-row" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {etiquetas.map(e => (
               <button key={e.id} type="button" onClick={() => toggle('etiquetas', e.id)} style={{ padding: '0.25rem 0.625rem', borderRadius: 4, fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', border: f.etiquetas.includes(e.id) ? `2px solid ${e.color}` : '1.5px solid var(--border)', backgroundColor: f.etiquetas.includes(e.id) ? e.color + '22' : 'var(--bg-card)', color: f.etiquetas.includes(e.id) ? e.color : 'var(--text-muted)' }}>{e.nombre}</button>
             ))}
@@ -169,7 +169,7 @@ export default function TareaForm({ tarea, usuario, usuarios, etiquetas, campana
           </span>
         </label>
 
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div className="modal-actions" style={{ display: 'flex', gap: 10 }}>
           <button onClick={onClose} style={{ flex: 1, padding: '0.65rem', border: '1.5px solid var(--border)', borderRadius: 8, backgroundColor: 'var(--bg-card)', cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text)' }}>Cancelar</button>
           <button onClick={guardar} disabled={!f.titulo.trim() || !f.deadline || guardando} style={{ flex: 2, padding: '0.65rem', border: 'none', borderRadius: 8, backgroundColor: '#f15922', color: '#fff', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600, opacity: !f.titulo.trim() || !f.deadline || guardando ? 0.6 : 1 }}>
             {guardando ? 'Guardando...' : tarea ? 'Guardar cambios' : 'Crear tarea'}

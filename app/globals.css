@@ -95,3 +95,18 @@ a, button { transition: all 0.15s ease; }
 /* Móvil: los campos nunca deben pasarse del contenedor (fechas, selects) */
 input, select, textarea { max-width: 100%; }
 input[type="date"], input[type="datetime-local"] { min-width: 0; }
+
+
+/* ===== Móvil (iPhone/Android) ===== */
+html, body { overflow-x: clip; }
+input[type="date"], input[type="datetime-local"], select { -webkit-appearance: none; appearance: none; display: block; min-height: 2.6rem; }
+select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23888' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.85rem center; padding-right: 2rem !important; }
+@media (max-width: 640px) {
+  /* Con menos de 16px, iOS hace zoom al tocar un campo y la pantalla queda cortada */
+  input, select, textarea, .ProseMirror { font-size: 16px !important; }
+  .modal-overlay { align-items: flex-end !important; padding: 0 !important; }
+  .modal-sheet { max-width: 100% !important; width: 100% !important; max-height: 92dvh !important; border-radius: 18px 18px 0 0 !important; padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom)) !important; }
+  .modal-actions { position: sticky; bottom: calc(-1rem - env(safe-area-inset-bottom)); margin: 0 -1rem; padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom)); background: var(--bg-card); border-top: 1px solid var(--border); }
+  .chip-row button { min-height: 40px; }
+  button, a, summary { touch-action: manipulation; }
+}
