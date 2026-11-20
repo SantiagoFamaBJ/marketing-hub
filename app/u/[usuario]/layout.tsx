@@ -22,6 +22,7 @@ const navItems = [
   { href: '/responsabilidades', label: 'Responsabilidades', emoji: '🧭' },
   { href: '/copys', label: 'Copys', emoji: '✍️' },
   { href: '/calendario', label: 'Calendario', emoji: '📅' },
+  { href: '/actividades', label: 'Actividades', emoji: '🗓️' },
   { href: '/manuales', label: 'Manuales', emoji: '📚' },
   { href: '/historial', label: 'Historial', emoji: '🕐' },
   { href: '/notas', label: 'Mis notas', emoji: '📝' },

@@ -12,6 +12,7 @@ export const MODULOS: { clave: string; ruta: string; label: string; emoji: strin
   { clave: 'responsabilidades', ruta: '/responsabilidades', label: 'Responsabilidades', emoji: '🧭' },
   { clave: 'copys', ruta: '/copys', label: 'Copys', emoji: '✍️' },
   { clave: 'calendario', ruta: '/calendario', label: 'Calendario', emoji: '📅' },
+  { clave: 'actividades', ruta: '/actividades', label: 'Actividades', emoji: '🗓️' },
   { clave: 'manuales', ruta: '/manuales', label: 'Manuales', emoji: '📚' },
   { clave: 'historial', ruta: '/historial', label: 'Historial', emoji: '🕐' },
   { clave: 'notas', ruta: '/notas', label: 'Mis notas', emoji: '📝' },
